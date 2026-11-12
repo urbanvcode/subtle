@@ -460,9 +460,17 @@
   // While a tab is captured, the browser keeps page fullscreen inside the window. The top frame
   // asks the extension to fullscreen the whole window too (iframe players surface here as well).
   if (window === window.top) {
-    on(document, "fullscreenchange", () => {
+    const askFullscreen = () => {
       if (!active || !alive()) return;
       chrome.runtime.sendMessage({ cmd: "fullscreen", on: !!document.fullscreenElement }).catch(() => {});
+    };
+    on(document, "fullscreenchange", () => {
+      askFullscreen();
+      // still only as big as the window a moment later (the request got lost, e.g. while the extension's
+      // background was waking up): ask once more
+      setTimeout(() => {
+        if (document.fullscreenElement && window.innerHeight < screen.height * 0.95) askFullscreen();
+      }, 800);
     });
   }
   on(document, "webkitfullscreenchange", () => setTimeout(raise, 50), { capture: true });

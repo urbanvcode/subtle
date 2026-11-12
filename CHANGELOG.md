@@ -5,6 +5,17 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-12
+
+### Fixed
+- The extension's **Subtle app** button starts Subtle when it isn't running (Windows): Subtle registers a
+  `subtle://` link for this, and the browser asks once whether to open it. A page waits until Subtle
+  answers, brings its window up and closes itself. Before, the button silently did nothing.
+- **Update now** in the Subtle window shows right away that the update started (the button could look
+  unchanged for a moment, so it felt like the click did nothing).
+- Fullscreen video in a subtitled tab asks again for the whole screen if the browser window didn't follow
+  the first time.
+
 ## [0.14.0] - 2026-11-12
 
 ### Added
@@ -202,7 +213,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/ddsaamir/subtle/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/ddsaamir/subtle/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/ddsaamir/subtle/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/ddsaamir/subtle/compare/v0.12.0...v0.13.0

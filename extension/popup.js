@@ -636,18 +636,19 @@ async function init() {
   };
   $("refresh").onclick = loadInfo;
   $("openPanel").onclick = () => {
-    // Ask the Subtle app to show its window (it's a normal Windows window, not a web page).
+    // Ask the Subtle app to show its window (it's a normal Windows window, not a web page). Not running:
+    // a page that starts it with a subtle:// link and waits for it.
+    const start = () => chrome.tabs.create({ url: chrome.runtime.getURL("launch.html") }).then(() => window.close());
     try {
       const ws = new WebSocket(s.serverUrl);
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: "show_panel" }));
         setTimeout(() => ws.close(), 300);
       };
-      ws.onerror = () => {
-        $("llmHint").textContent = "Subtle isn't running - start it from the desktop or Start-menu shortcut.";
-        $("llmHint").className = "hint err";
-      };
-    } catch {}
+      ws.onerror = start;
+    } catch {
+      start();
+    }
   };
   $("toggle").onclick = toggle;
   $("summary").onclick = () => showTab("lang");

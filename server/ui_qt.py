@@ -15,6 +15,7 @@ import asyncio
 import ctypes
 import os
 import sys
+import time
 from pathlib import Path
 
 from PySide6.QtCore import (QEasingCurve, QEvent, QObject, QPropertyAnimation, QRectF, QSize, Qt, QTimer, QUrl, Signal,
@@ -968,7 +969,8 @@ class ControlPanel:
         self.upd_url = ""
         ul.addWidget(self.button("Release notes", lambda: self.upd_url and QDesktopServices.openUrl(QUrl(self.upd_url))),
                      0, Qt.AlignVCenter)
-        self.upd_btn = self.button("Update now", lambda: (self.upd_btn.setEnabled(False), self.cmd("update_now")), "primary")
+        self.upd_btn = self.button("Update now", self.update_clicked, "primary")
+        self._upd_clicked = 0.0
         ul.addWidget(self.upd_btn, 0, Qt.AlignVCenter)
         self.upd.hide()
         lay.addWidget(self.upd)
@@ -1436,12 +1438,15 @@ class ControlPanel:
                 text = f"Installing Subtle {up['version']}: Subtle closes and starts again by itself."
             elif state == "error":
                 text = f"The update didn't work: {u.get('error', '')}"
+            elif time.monotonic() - self._upd_clicked < 20:     # clicked; the download hasn't shown up yet
+                state, text = "downloading", f"Getting Subtle {up['version']}…"
             else:
                 text = (f"Subtle {up['version']} is available (you have {st.get('version', '')}). "
                         "Update now: your models and settings stay, and Subtle restarts by itself.")
             self.set_text(self.upd_text, text)
-            self.upd_btn.setEnabled(state not in ("downloading", "ready", "applying"))
-            self.set_text(self.upd_btn, "Try again" if state == "error" else "Update now")
+            busy = state in ("downloading", "ready", "applying")
+            self.upd_btn.setEnabled(not busy)
+            self.set_text(self.upd_btn, "Updating…" if busy else "Try again" if state == "error" else "Update now")
             if self.upd.isHidden():
                 self.upd.show()
         elif not self.upd.isHidden():
@@ -1498,6 +1503,14 @@ class ControlPanel:
             missing = not models.get("whisper")
             self.set_text(self.notice_text, "No speech model is installed yet, so subtitles can't start.")
             self.notice.setVisible(missing)
+
+    def update_clicked(self):
+        """Show at once that the update started (the state only says so a moment later)."""
+        self._upd_clicked = time.monotonic()
+        self.upd_btn.setEnabled(False)
+        self.set_text(self.upd_btn, "Updating…")
+        self.set_text(self.upd_text, "Getting the new version… Subtle closes and starts again by itself.")
+        self.cmd("update_now", lambda r: self.refresh())
 
     def render_side(self):
         st = self.st

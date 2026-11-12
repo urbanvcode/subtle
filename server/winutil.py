@@ -135,6 +135,34 @@ def windowless_python() -> str:
     return str(w) if w.is_file() else str(exe)
 
 
+def register_url_protocol(supervisor: Path, icon: Path | None = None) -> bool:
+    """Windows: make subtle:// links start Subtle (the extension's "Subtle app" button uses one when Subtle
+    isn't running; the browser asks first). Per user, no admin rights. The link's own text is never passed
+    on: it only starts Subtle, or shows the window of the one already running."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+        command = f'"{windowless_python()}" "{supervisor}"'
+        base = r"Software\Classes\subtle"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base) as k:
+            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, "URL:Subtle")
+            winreg.SetValueEx(k, "URL Protocol", 0, winreg.REG_SZ, "")
+        if icon is not None and icon.is_file():
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base + r"\DefaultIcon") as k:
+                winreg.SetValueEx(k, "", 0, winreg.REG_SZ, str(icon))
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base + r"\shell\open\command") as k:
+            try:
+                if winreg.QueryValueEx(k, "")[0] == command:
+                    return True            # already there (Subtle checks at every start)
+            except OSError:
+                pass
+            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, command)
+        return True
+    except OSError:
+        return False
+
+
 def startup_shortcut() -> Path:
     if sys.platform == "win32":
         return Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Subtle.lnk"
