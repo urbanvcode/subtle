@@ -5,6 +5,21 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-12
+
+### Added
+- **Update now**: one click in the Subtle window or the extension popup downloads the new version, checks
+  it against the checksum GitHub publishes, keeps models and settings, installs new packages if needed,
+  and restarts Subtle. If anything fails, the old version is put back. (Updating from 0.5-0.8 is by hand
+  once.)
+- The browser extension **reloads itself** after an update (no more `chrome://extensions` step).
+
+### Changed
+- The extension popup is now **five tabs** with icons (Home, Language, Display, Style, More) instead of one
+  long list. Home shows what the subtitles will be ("Japanese → English, Best engine") at a glance.
+- Update notices and "restart the Subtle app" messages appear as a banner at the top of the popup.
+
+
 ## [0.8.0] - 2026-11-12
 
 ### Added
@@ -88,7 +103,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ddsaamir/subtle/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ddsaamir/subtle/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ddsaamir/subtle/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ddsaamir/subtle/compare/v0.5.0...v0.6.0

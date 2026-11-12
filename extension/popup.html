@@ -177,6 +177,39 @@
   details.more[open] summary .chev { transform: rotate(90deg); }
   details.more .inner { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 
+  /* Tabs */
+  .wrap { min-height: 540px; }          /* the popup keeps its size when switching tabs */
+  .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; padding: 4px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow);
+    position: sticky; top: 0; z-index: 5; }
+  .tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 2px 6px;
+    border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 10.5px; font-weight: 600;
+    cursor: pointer; transition: background .15s ease, color .15s ease; }
+  .tab svg { width: 18px; height: 18px; }
+  .tab:hover { background: var(--field-hover); color: var(--fg); }
+  .tab.on { background: var(--accent-soft); color: var(--accent); }
+  .tab .dot { position: absolute; top: 6px; right: calc(50% - 15px); width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok); box-shadow: 0 0 0 2px var(--card); display: none; }
+  .tab.live .dot { display: block; }
+  .panel { display: none; flex-direction: column; gap: var(--gap); }
+  .panel.on { display: flex; animation: fadein .14s ease; }
+  @keyframes fadein { from { opacity: .4; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+  /* Home: what the subtitles will be (opens the Language tab) */
+  .summary { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--field); cursor: pointer; text-align: left; color: var(--fg); }
+  .summary:hover { background: var(--field-hover); }
+  .summary > svg:first-child { width: 17px; height: 17px; color: var(--accent); }
+  .summary .stxt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+  .summary .stxt b { font-size: 12.5px; font-weight: 650; }
+  .summary .stxt small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .summary .chev { width: 14px; height: 14px; color: var(--faint); }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; font-size: 12px; }
+  .keys span:nth-child(odd) { display: flex; gap: 3px; }
+  .keys span:nth-child(even) { color: var(--muted); }
+  .ver { text-align: center; }
+
   /* Banner at the top: update available / app needs a restart */
   .banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r);
     border: 1px solid var(--accent); background: var(--accent-soft); }
@@ -203,8 +236,6 @@
     color: var(--fg); font-size: 12px; font-weight: 600; cursor: pointer; }
   .fmt:hover { filter: brightness(1.08); }
 
-  footer { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 2px 4px 4px; }
-  footer .hint { margin: 0; }
   kbd { font: 10.5px ui-monospace, Consolas, monospace; padding: 1px 5px; border: 1px solid var(--line);
     border-bottom-width: 2px; border-radius: 5px; background: var(--card); color: var(--fg); }
 </style>
@@ -226,9 +257,23 @@
     <button id="bannerBtn" class="bbtn hidden"></button>
   </div>
 
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="home" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>Home</span><i class="dot"></i></button>
+    <button class="tab" role="tab" data-tab="lang" title="Language"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg><span>Language</span><i class="dot"></i></button>
+    <button class="tab" role="tab" data-tab="display" title="Display"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 15h5M14 15h4"/></svg><span>Display</span><i class="dot"></i></button>
+    <button class="tab" role="tab" data-tab="style" title="Style"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg><span>Style</span><i class="dot"></i></button>
+    <button class="tab" role="tab" data-tab="more" title="More"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>More</span><i class="dot"></i></button>
+  </nav>
+
+  <div class="panel" data-tab="home" role="tabpanel">
   <section class="card">
     <div id="status" class="status"><i></i><span id="statusText">Not running</span></div>
     <button id="toggle" class="main"></button>
+    <button id="summary" class="summary" title="Languages and engine">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>
+      <span class="stxt"><b id="sumLangs"></b><small id="sumEngine"></small></span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
     <div class="tools extra" id="tools">
       <button id="catchUp" class="tool" title="A short summary of the last few minutes, shown on the video (Alt+Shift+U)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
@@ -249,7 +294,9 @@
       <input id="autoStart" class="switch" type="checkbox" />
     </label>
   </section>
+  </div>
 
+  <div class="panel" data-tab="lang" role="tabpanel">
   <section class="card">
     <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>Translation</h2>
     <div class="langs">
@@ -272,7 +319,9 @@
     <label id="llmRow" class="field">Translator<select id="llmModel"></select></label>
     <p id="llmHint" class="hint hidden"></p>
   </section>
+  </div>
 
+  <div class="panel" data-tab="display" role="tabpanel">
   <section class="card">
     <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 15h5M14 15h4"/></svg>Display</h2>
     <div class="two">
@@ -299,7 +348,9 @@
     </label>
     <label class="field extra hidden" id="readingRow">Japanese readings<select id="reading"></select></label>
   </section>
+  </div>
 
+  <div class="panel" data-tab="style" role="tabpanel">
   <section class="card" id="styleCard">
     <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Subtitle style
       <button id="styleReset" class="mini">Reset</button></h2>
@@ -338,7 +389,9 @@
       </div>
     </details>
   </section>
+  </div>
 
+  <div class="panel" data-tab="more" role="tabpanel">
   <section class="card">
     <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Privacy</h2>
     <label class="opt">
@@ -347,27 +400,29 @@
     </label>
   </section>
 
-  <details class="card">
-    <summary>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-      Advanced
-      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-    </summary>
-    <div class="inner">
+  <section class="card">
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Connection</h2>
+    <div class="stack">
       <label class="field">Subtitle server<input id="server" type="text" spellcheck="false" /></label>
       <button id="refresh" class="iconbtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
         Refresh model lists
       </button>
     </div>
-  </details>
+  </section>
 
-  <footer>
-    <p class="hint">Start/stop anywhere: <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>S</kbd></p>
-    <p class="hint extra"><kbd>H</kbd> hide · <kbd>L</kbd> last line again · <kbd>U</kbd> catch me up (with <kbd>Alt</kbd> <kbd>Shift</kbd>)</p>
-    <p class="hint extra">Drag the subtitles on the video to move them; double-click puts them back.</p>
-    <p id="version" class="hint"></p>
-  </footer>
+  <section class="card">
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>Shortcuts</h2>
+    <div class="keys">
+      <span><kbd>Alt</kbd><kbd>Shift</kbd><kbd>S</kbd></span><span>Start or stop subtitles</span>
+      <span class="extra"><kbd>Alt</kbd><kbd>Shift</kbd><kbd>H</kbd></span><span class="extra">Hide or show them</span>
+      <span class="extra"><kbd>Alt</kbd><kbd>Shift</kbd><kbd>L</kbd></span><span class="extra">Show the last line again</span>
+      <span class="extra"><kbd>Alt</kbd><kbd>Shift</kbd><kbd>U</kbd></span><span class="extra">Catch me up</span>
+    </div>
+    <p class="hint extra">Drag the subtitles on the video to move them; double-click puts them back. Change keys at <b>chrome://extensions/shortcuts</b>.</p>
+  </section>
+  <p id="version" class="hint ver"></p>
+  </div>
 </div>
 <script src="substyle.js"></script>
 <script src="popup.js"></script>

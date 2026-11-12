@@ -66,7 +66,7 @@ after the speaker stopped:
   </tr>
   <tr>
     <td><b>Subtle app.</b> Status, subtitle delay in milliseconds, and exactly how much memory each part uses.</td>
-    <td><b>Browser extension.</b> One button to start, pick the languages and the engine.</td>
+    <td><b>Browser extension.</b> Five tabs: start and tools, languages, display, style and more.</td>
   </tr>
   <tr>
     <td><img src="docs/images/app-models.png" alt="Models page with recommended downloads for your graphics card"></td>
@@ -304,8 +304,7 @@ Subtle only uses memory while you're actually watching something with subtitles:
 | Installer: "NVIDIA driver too old" | Update it from [nvidia.com/drivers](https://www.nvidia.com/drivers) or the NVIDIA app, then run `Install Subtle.bat` again. |
 | Anything else | Subtle window → Settings → **Show activity log**, and the install log in `logs\install.log`. |
 
-**Update:** the Subtle window tells you when a new version is out. Replace the Subtle files with the new version (keep `models\`, `runtime\` and
-`settings.json`), run `Install Subtle.bat` again, and reload the extension in `chrome://extensions`.
+**Update:** when a new version is out, the Subtle window and the extension popup show **Update now**. One click downloads it (checked against GitHub's checksum), keeps your models and settings, and restarts Subtle; if anything goes wrong, the old version is put back. The browser extension reloads itself afterwards. Coming from 0.5-0.8, update by hand once: replace the Subtle files with the new version (keep `models\`, `runtime\` and `settings.json`), run `Install Subtle.bat` again, and reload the extension in `chrome://extensions`.
 
 **Uninstall:** quit Subtle (tray icon → Quit), untick "Start with Windows" if you turned it on,
 delete the Subtle folder and the two shortcuts, and remove the extension from the browser.

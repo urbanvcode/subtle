@@ -77,6 +77,37 @@ function fillSelect(sel, items, value) {
 
 const shortName = (id) => id.split("/").pop();
 
+// ---- tabs ----------------------------------------------------------------------
+function showTab(key) {
+  for (const t of document.querySelectorAll(".tab")) {
+    const on = t.dataset.tab === key;
+    t.classList.toggle("on", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+  }
+  for (const p of document.querySelectorAll(".panel")) p.classList.toggle("on", p.dataset.tab === key);
+  try {
+    chrome.storage.local.set({ popupTab: key }).catch(() => {});
+  } catch {}
+}
+
+async function initTabs() {
+  for (const t of document.querySelectorAll(".tab")) t.onclick = () => showTab(t.dataset.tab);
+  let key = "home";
+  try {
+    key = (await chrome.storage.local.get({ popupTab: "home" })).popupTab || "home";
+  } catch {}
+  showTab(document.querySelector(`.tab[data-tab="${key}"]`) ? key : "home");
+}
+
+// Home: "Japanese -> English" and the engine, at a glance (click: the Language tab)
+function renderSummary() {
+  const name = (list, code) => (list.find(([c]) => c === code) || [code, code])[1];
+  $("sumLangs").textContent = `${name(SPOKEN, s.language)} → ${name(TARGETS, s.target)}`;
+  const llm = s.mode === "llm" || s.target !== "en";
+  const model = s.asrModel && s.asrModel !== "auto" ? ` · ${shortName(s.asrModel)}` : "";
+  $("sumEngine").textContent = (llm ? "Best engine (speech model + translator)" : "Fast engine (Whisper only)") + model;
+}
+
 // ---- status / start-stop -------------------------------------------------------
 async function refreshStatus() {
   const state = await chrome.runtime.sendMessage({ cmd: "status" });
@@ -89,6 +120,8 @@ async function refreshStatus() {
     : elsewhere
       ? "Running on another tab"
       : "Not running";
+  const homeTab = document.querySelector('.tab[data-tab="home"]');
+  if (homeTab) homeTab.classList.toggle("live", here && state.status === "live");
   const btn = $("toggle");
   btn.classList.toggle("stop", here);
   btn.innerHTML = here ? `${STOP_ICON}Stop subtitles` : `${PLAY_ICON}Start subtitles on this tab`;
@@ -259,6 +292,7 @@ function renderModels() {
 }
 
 function renderMode() {
+  renderSummary();
   const llm = s.mode === "llm" || s.target !== "en";
   $("modeWhisper").classList.toggle("on", !llm);
   $("modeLlm").classList.toggle("on", llm);
@@ -501,7 +535,10 @@ async function init() {
     save({ mode: "llm" });
     renderMode();
   };
-  $("asrModel").onchange = (e) => save({ asrModel: e.target.value });
+  $("asrModel").onchange = (e) => {
+    save({ asrModel: e.target.value });
+    renderSummary();
+  };
   $("llmModel").onchange = (e) => save({ llmModel: e.target.value });
   const saveSize = throttle((v) => save({ fontScale: v }), 500);
   const savePos = throttle((v) => save({ position: v }), 500);
@@ -543,6 +580,7 @@ async function init() {
     } catch {}
   };
   $("toggle").onclick = toggle;
+  $("summary").onclick = () => showTab("lang");
   $("catchUp").onclick = async () => {
     await chrome.runtime.sendMessage({ cmd: "catch-up", tabId: tab.id }).catch(() => {});
     window.close(); // the summary appears on the video
@@ -556,6 +594,7 @@ async function init() {
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.cmd === "capture-status") setTimeout(refreshStatus, 50);
   });
+  await initTabs();
   renderMode();
   renderVersion();
   refreshStatus();

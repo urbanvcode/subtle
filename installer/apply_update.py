@@ -159,7 +159,10 @@ def main():
         say("The old version is back.")
         start_subtle()
         if sys.platform == "win32":
-            input("Press Enter to close this window.")
+            try:
+                input("Press Enter to close this window.")
+            except EOFError:
+                pass
         return 1
 
     say(f"Subtle {ver} is installed. Starting it...")
