@@ -34,6 +34,10 @@
 - **Light**: uses no video memory until you start subtitles, and unloads by itself when you stop.
 - **Easy**: one-click install, a normal Windows app to manage models, and a browser extension with a
   start button.
+- **Save subtitles** as `.srt` or `.vtt` files that work in VLC and other players.
+- **Catch me up**: missed something? A short summary of the last few minutes appears on the video.
+- **Yours to arrange**: drag the subtitles anywhere on the video (remembered per site), hide them or
+  show the last line again with a shortcut, and pick colours, box, outline and size.
 
 ## Examples
 
@@ -68,6 +72,18 @@ after the speaker stopped:
     <td><b>Subtitle style.</b> Colours, box, outline and size, with a live preview.</td>
   </tr>
 </table>
+
+## Shortcuts
+
+| Keys | What it does |
+|---|---|
+| **Alt+Shift+S** | Start or stop subtitles on the current tab |
+| **Alt+Shift+H** | Hide or show the subtitles |
+| **Alt+Shift+L** | Show the last line again |
+| **Alt+Shift+U** | Catch me up: a short summary of the last few minutes |
+| Drag a subtitle | Move the subtitles (remembered for that website); double-click puts them back |
+
+You can change the keys at `chrome://extensions/shortcuts`.
 
 ## How it works
 
@@ -204,12 +220,16 @@ Subtle only uses memory while you're actually watching something with subtitles:
 ## Privacy
 
 - **Nothing you watch leaves your PC.** The extension only talks to the Subtle app on your PC
-  (`127.0.0.1`), and the app talks to nothing else. The Subtle window and its connection only work on this PC.
+  (`127.0.0.1`). The Subtle window and its connection only work on this PC.
 - **Subtitles live in memory.** No subtitle text or audio is written to disk, unless you turn on
   **Save transcripts** in the extension popup (one text file per session in `transcripts\`).
 - **Speaker voiceprints** (Identify speakers, off by default) are kept in memory only.
 - **Error log:** `logs\errors.log` keeps errors only, never subtitle text (about 1 MB at most).
-- The internet is used only by `Install Subtle.bat` and by the **Download** buttons on the Models page.
+- **Catch me up** summaries are made by the translator on your PC, from subtitles kept in memory.
+- **Saved subtitle files** (`.srt` / `.vtt`) are only made when you press Save subtitles.
+- The internet is used only by `Install Subtle.bat`, the **Download** buttons on the Models page, and
+  a daily check for new versions: Subtle asks GitHub for the newest version number and sends nothing
+  else (turn it off in Settings → *Tell me about new versions*).
 
 ## Troubleshooting
 
@@ -223,7 +243,7 @@ Subtle only uses memory while you're actually watching something with subtitles:
 | Installer: "NVIDIA driver too old" | Update it from [nvidia.com/drivers](https://www.nvidia.com/drivers) or the NVIDIA app, then run `Install Subtle.bat` again. |
 | Anything else | Subtle window → Settings → **Show activity log**, and the install log in `logs\install.log`. |
 
-**Update:** replace the Subtle files with the new version (keep `models\`, `runtime\` and
+**Update:** the Subtle window tells you when a new version is out. Replace the Subtle files with the new version (keep `models\`, `runtime\` and
 `settings.json`), run `Install Subtle.bat` again, and reload the extension in `chrome://extensions`.
 
 **Uninstall:** quit Subtle (tray icon → Quit), untick "Start with Windows" if you turned it on,
@@ -242,6 +262,8 @@ delete the Subtle folder and the two shortcuts, and remove the extension from th
 | Show original-language line | With Best, shows the transcribed original under the translation |
 | Identify speakers | Gives each voice its own colour (26 MB voiceprint model, Models page) |
 | Auto-start when a video plays | Subtitles start by themselves on any tab where a video plays with sound (not for DRM video) |
+| Catch me up | Shows a short summary of the last few minutes on the video (uses the translator model) |
+| Save subtitles | Saves this video's subtitles as `.srt` or `.vtt`, with the original line too if *Original-language line* is on |
 
 ## For developers
 

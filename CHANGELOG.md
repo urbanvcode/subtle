@@ -5,6 +5,19 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-12
+
+### Added
+- **Save subtitles** as `.srt` or `.vtt` from the popup. The lines are timed to the video itself (also
+  after seeking or at other playback speeds), and include the original line if *Original-language line* is on.
+- **Catch me up** (popup button or **Alt+Shift+U**): a short summary of the last five minutes, shown on
+  the video in your subtitle language. Made by the translator on your PC from lines kept in memory.
+- **Move the subtitles** by dragging them on the video. The position is remembered for each website;
+  double-click puts them back.
+- **Shortcuts**: **Alt+Shift+H** hides or shows the subtitles, **Alt+Shift+L** shows the last line again.
+- **Update notice**: the Subtle window (and the popup) tell you when a new version is on GitHub. Once a
+  day Subtle asks GitHub for the newest version number; nothing else is sent. Settings can turn it off.
+
 ### Changed
 - The README and the Setup guide now list every supported browser (Chrome, Edge, Brave, Opera,
   Vivaldi and other Chromium browsers) and use `chrome://extensions`, which works in all of them.
@@ -43,5 +56,6 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ddsaamir/subtle/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ddsaamir/subtle/releases/tag/v0.5.0

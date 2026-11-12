@@ -42,11 +42,29 @@
   const norm = (t) => (t || "").toLowerCase().replace(/[\s.!?。、,！？…]+/g, " ").trim();
   let scanTimer = 0;
   let posKey = ""; // last geometry written to the overlay (styles are only touched when it changes)
+  let hiddenByUser = false; // Alt+Shift+H
+  let lastFinal = null; // { text, src, speaker } for "show the last line again"
+
+  // Finished lines on the video's own clock, for "Save subtitles" (.srt / .vtt). Memory only: they are
+  // gone when the page closes, and only leave the page when the user saves them.
+  let cues = [];
+  let cueMedia = ""; // the video they belong to: a new video starts a new list
+  const pageStart = performance.now();
+
+  // Where the subtitles sit, if they were dragged on this site: { x: centre as a share of the video's
+  // width, y: % of its height above the bottom }. Kept per site in local storage (not synced).
+  const SITE = location.hostname || "local";
+  let sitePos = null;
 
   chrome.storage.sync.get(SETTINGS).then((s) => {
     settings = { ...SETTINGS, ...s };
     applyStyle();
   });
+  chrome.storage.local.get({ sitePositions: {} }).then((r) => {
+    sitePos = (r.sitePositions || {})[SITE] || null;
+    posKey = "";
+    position();
+  }).catch(() => {});
   const onStorage = (changes, area) => {
     if (area !== "sync") return;
     for (const [k, v] of Object.entries(changes)) if (k in SETTINGS) settings[k] = v.newValue;
@@ -313,15 +331,85 @@
         .prev { font-size: .82em; opacity: .7; }
         .partial { opacity: .85; font-style: italic; }
         .src { font-size: .7em; font-weight: 500; opacity: .9; margin-top: -.1em; }`;
-    root.innerHTML = `<style>${css}</style>
+    // The lines themselves can be dragged (the rest of the overlay lets clicks through to the player).
+    const dragCss = `.line { pointer-events: auto; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+      .box.dragging .line { cursor: grabbing; outline: 2px dashed rgba(255, 255, 255, .55); outline-offset: 2px; }`;
+    root.innerHTML = `<style>${css}${dragCss}</style>
       <div class="box"><div class="line prev"></div><div class="line cur"></div><div class="line src"></div></div>`;
     boxEl = root.querySelector(".box");
     prevEl = root.querySelector(".prev");
     curEl = root.querySelector(".cur");
     srcEl = root.querySelector(".src");
     applyStyle();
+    initDrag(root);
     document.documentElement.appendChild(host);
   }
+
+  // ---- moving the subtitles: drag them; double-click puts them back ----------------
+  function initDrag(root) {
+    let drag = null;
+    const stop = (e) => {
+      e.stopPropagation(); // the player underneath must not see these (no pause on click)
+    };
+    root.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || !e.target.classList || !e.target.classList.contains("line")) return;
+      stop(e);
+      e.preventDefault();
+      const g = geometry();
+      const p = currentPos();
+      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, px: p.x, py: p.y, g, moved: false };
+      try {
+        e.target.setPointerCapture(e.pointerId);
+      } catch {}
+    });
+    root.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      stop(e);
+      const dx = e.clientX - drag.x0;
+      const dy = e.clientY - drag.y0;
+      if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+      drag.moved = true;
+      boxEl.classList.add("dragging");
+      sitePos = {
+        x: Math.max(0.1, Math.min(0.9, drag.px + dx / drag.g.width)),
+        y: Math.max(0, Math.min(88, drag.py - (dy / drag.g.h) * 100)),
+      };
+      posKey = "";
+      position();
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      stop(e);
+      const moved = drag.moved;
+      drag = null;
+      boxEl.classList.remove("dragging");
+      if (moved) saveSitePos(sitePos);
+    };
+    root.addEventListener("pointerup", end);
+    root.addEventListener("pointercancel", end);
+    root.addEventListener("click", stop);
+    root.addEventListener("dblclick", (e) => {
+      stop(e);
+      sitePos = null; // back to the Height set in the popup
+      posKey = "";
+      position();
+      saveSitePos(null);
+    });
+  }
+
+  function saveSitePos(p) {
+    chrome.storage.local
+      .get({ sitePositions: {} })
+      .then((r) => {
+        const all = r.sitePositions || {};
+        if (p) all[SITE] = { x: +p.x.toFixed(3), y: +p.y.toFixed(1) };
+        else delete all[SITE];
+        return chrome.storage.local.set({ sitePositions: all });
+      })
+      .catch(() => {});
+  }
+
+  const currentPos = () => sitePos || { x: 0.5, y: settings.position };
 
   function applyStyle() {
     if (STYLE && boxEl) STYLE.apply(boxEl, settings);
@@ -350,21 +438,33 @@
 
   const hasText = () => !!(curEl && (curEl.textContent || prevEl.textContent));
 
-  function position() {
-    if (!host || !hasText()) return;
+  // The visible part of the video: { left, top, width, bottom, h } in viewport pixels.
+  function geometry() {
     const v = pickVideo();
     let r = v ? v.getBoundingClientRect() : null;
     if (!r || r.width < 40 || r.height < 30) r = { left: 0, top: 0, width: innerWidth, height: innerHeight };
     const left = Math.max(0, r.left);
     const right = Math.min(innerWidth, r.left + r.width);
-    const bottom = Math.min(innerHeight, r.top + r.height);
-    const width = Math.max(160, right - left);
-    const h = Math.min(r.height, innerHeight);
+    return {
+      left,
+      top: Math.max(0, r.top),
+      width: Math.max(160, right - left),
+      bottom: Math.min(innerHeight, r.top + r.height),
+      h: Math.min(r.height, innerHeight),
+    };
+  }
+
+  function position() {
+    if (note) placeNote();
+    if (!host || !hasText()) return;
+    const { left, width, bottom, h } = geometry();
     const fontPx = Math.max(14, Math.min(64, h * 0.05 * settings.fontScale));
     const share = Math.max(0.4, Math.min(1, (+settings.lineWidth || 90) / 100)); // "Line width" setting
     const widthPx = Math.round(width * share);
-    const leftPx = Math.round(left + (width - widthPx) / 2);
-    const bottomPx = Math.round(innerHeight - bottom + h * (settings.position / 100));
+    const p = currentPos();
+    const centre = left + width * p.x;
+    const leftPx = Math.round(Math.max(0, Math.min(innerWidth - widthPx, centre - widthPx / 2)));
+    const bottomPx = Math.round(innerHeight - bottom + h * (p.y / 100));
     // This runs every frame while a line is up; only write styles when the video actually moved.
     const key = `${leftPx}|${widthPx}|${bottomPx}|${fontPx}`;
     if (key === posKey) return;
@@ -402,7 +502,7 @@
 
   function refreshVisibility() {
     if (!host) return;
-    if (hasText()) {
+    if (hasText() && !hiddenByUser) {
       host.style.setProperty("display", "block", "important");
       if (!host.matches(":popover-open")) raise();
       if (!rafId) rafId = requestAnimationFrame(loop);
@@ -477,9 +577,118 @@
     refreshVisibility();
   }
 
+  // ---- note card at the top of the video ("Catch me up", short hints) ----------------
+  let note = null; // { host, body }
+  let noteTimer = 0;
+
+  function showNote(title, text, ms = 6000) {
+    if (!note || !note.host.isConnected) {
+      const h = document.createElement("subtle-note");
+      h.setAttribute("popover", "manual");
+      h.setAttribute("style", "all: initial; position: fixed !important; inset: auto !important; margin: 0 !important; " +
+        "padding: 0 !important; border: 0 !important; background: transparent !important; overflow: visible !important; " +
+        "z-index: 2147483647 !important; display: block;");
+      const root = h.attachShadow({ mode: "closed" });
+      root.innerHTML = `<style>
+        .card { box-sizing: border-box; width: 100%; padding: .8em 1em .9em; border-radius: .7em; cursor: pointer;
+          background: rgba(14, 16, 20, .9); color: #f2f4f7; font: 500 15px/1.45 system-ui, "Segoe UI", sans-serif;
+          box-shadow: 0 6px 24px rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .12); }
+        .t { display: flex; align-items: center; gap: .5em; font-weight: 650; font-size: 13px; letter-spacing: .02em;
+          color: #52d3a8; margin-bottom: .35em; }
+        .t::after { content: "click to close"; margin-left: auto; font-weight: 400; font-size: 11px; color: rgba(255,255,255,.45); }
+        .b { white-space: pre-line; }
+        .b:empty { display: none; }
+      </style><div class="card"><div class="t"></div><div class="b"></div></div>`;
+      root.querySelector(".card").addEventListener("click", (e) => {
+        e.stopPropagation();
+        hideNote();
+      });
+      document.documentElement.appendChild(h);
+      note = { host: h, title: root.querySelector(".t"), body: root.querySelector(".b") };
+    }
+    note.title.textContent = title;
+    note.body.textContent = text || "";
+    try {
+      if (note.host.matches(":popover-open")) note.host.hidePopover();
+      note.host.showPopover(); // above a fullscreen player
+    } catch {}
+    placeNote();
+    clearTimeout(noteTimer);
+    if (ms) {
+      noteTimer = setTimeout(function hideLater() {
+        if (isPaused()) return (noteTimer = setTimeout(hideLater, 1000)); // keep it while the video is paused
+        hideNote();
+      }, ms);
+    }
+  }
+
+  function hideNote() {
+    clearTimeout(noteTimer);
+    if (!note) return;
+    try {
+      note.host.hidePopover();
+    } catch {}
+    note.host.remove();
+    note = null;
+  }
+
+  function placeNote() {
+    if (!note) return;
+    const g = geometry();
+    const w = Math.round(Math.min(560, g.width * 0.86));
+    note.host.style.setProperty("left", `${Math.round(g.left + (g.width - w) / 2)}px`, "important");
+    note.host.style.setProperty("top", `${Math.round(g.top + Math.max(12, g.h * 0.05))}px`, "important");
+    note.host.style.setProperty("width", `${w}px`, "important");
+  }
+  on(window, "resize", () => note && placeNote());
+
+  // ---- lines kept for "Save subtitles" -----------------------------------------
+  function recordCue(msg) {
+    if (!msg.text || typeof msg.dur !== "number") return;
+    const v = video && video.isConnected ? video : pickVideo();
+    const media = v ? v.currentSrc || v.src || "video" : "page";
+    if (media !== cueMedia) {
+      cues = []; // another video: its own list
+      cueMedia = media;
+    }
+    const rate = v && v.playbackRate > 0 ? v.playbackRate : 1;
+    // "age": seconds of audio heard since the line ended; on the video's clock that is age x speed.
+    const now = v && isFinite(v.currentTime) ? v.currentTime : (performance.now() - pageStart) / 1000;
+    const end = Math.max(0, now - (msg.age || 0) * rate);
+    const start = Math.max(0, end - msg.dur * rate);
+    cues.push({ start: +start.toFixed(2), end: +end.toFixed(2), text: msg.text, src: msg.src || "" });
+    if (cues.length > 20000) cues.shift();
+  }
+
+  function onHotkey(action) {
+    if (action === "hide") {
+      hiddenByUser = !hiddenByUser;
+      refreshVisibility();
+      showNote(hiddenByUser ? "Subtitles hidden" : "Subtitles shown", "Alt+Shift+H to switch", 1800);
+    } else if (action === "repeat") {
+      if (!lastFinal) return showNote("No line yet", "", 1800);
+      hiddenByUser = false;
+      showFinal(lastFinal.text, lastFinal.src, lastFinal.speaker);
+    }
+  }
+
   // ---- messages from the extension ---------------------------------------
-  function onMessage(msg) {
+  function onMessage(msg, _sender, sendResponse) {
     switch (msg.type) {
+      case "get-cues":
+        // Asked by the popup's "Save subtitles". Frames without lines stay quiet, so the frame
+        // with the video answers.
+        if (!cues.length) return false;
+        sendResponse({ cues, title: document.title || location.hostname });
+        return false;
+      case "hotkey":
+        onHotkey(msg.action);
+        break;
+      case "summary":
+        if (msg.pending) showNote("Catching you up…", "Summarising the last few minutes", 0);
+        else if (msg.error) showNote("Catch me up", msg.error, 7000);
+        else showNote("What you missed", msg.text, Math.min(40000, 12000 + (msg.text || "").length * 60));
+        break;
       case "active":
         active = msg.active;
         lastFinalId = -1; // a new capture is a new server connection
@@ -501,6 +710,8 @@
           lastFinalId = msg.id; // finished lines arrive in order; ids start over if the server restarts
           if (msg.text) {
             lastFinalText = msg.text;
+            lastFinal = { text: msg.text, src: msg.src, speaker: msg.speaker };
+            recordCue(msg);
             showFinal(msg.text, msg.src, msg.speaker);
           } else if (curEl && curEl.classList.contains("partial")) {
             // The line turned out to be nothing (noise, dropped): don't leave its preview behind.
@@ -541,6 +752,7 @@
       mo.disconnect();
       clearInterval(periodic);
       clearAll();
+      hideNote();
       if (host) host.remove();
       try {
         chrome.runtime.onMessage.removeListener(onMessage);

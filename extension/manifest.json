@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Subtle",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A universal open-source video subtitle extension. Real-time subtitles and translation for any video, generated locally on your own GPU.",
   "icons": {
     "16": "icons/icon16.png",
@@ -51,6 +51,24 @@
         "default": "Alt+Shift+S"
       },
       "description": "Start or stop subtitles on the current tab"
+    },
+    "hide-subs": {
+      "suggested_key": {
+        "default": "Alt+Shift+H"
+      },
+      "description": "Hide or show the subtitles"
+    },
+    "repeat-line": {
+      "suggested_key": {
+        "default": "Alt+Shift+L"
+      },
+      "description": "Show the last line again"
+    },
+    "catch-up": {
+      "suggested_key": {
+        "default": "Alt+Shift+U"
+      },
+      "description": "Catch me up: a short summary of the last few minutes"
     }
   }
 }

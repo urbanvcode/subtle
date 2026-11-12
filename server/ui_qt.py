@@ -17,9 +17,9 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import (QEasingCurve, QObject, QPropertyAnimation, QRectF, QSize, Qt, QTimer, Signal,
+from PySide6.QtCore import (QEasingCurve, QObject, QPropertyAnimation, QRectF, QSize, Qt, QTimer, QUrl, Signal,
                             Property)
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPainter
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget)
@@ -716,6 +716,20 @@ class ControlPanel:
     # ================================================================ HOME
     def _home(self, lay):
         c = self.c
+        # "A new version is available" (from the daily GitHub check; Settings can turn it off)
+        self.upd = QFrame()
+        self.upd.setObjectName("soft")
+        ul = QHBoxLayout(self.upd)
+        ul.setContentsMargins(20, 12, 20, 12)
+        ul.setSpacing(16)
+        self.upd_text = self.label("", "bold", wrap=True)
+        ul.addWidget(self.upd_text, 1)
+        self.upd_url = ""
+        ul.addWidget(self.button("Download page", lambda: self.upd_url and QDesktopServices.openUrl(QUrl(self.upd_url)), "primary"),
+                     0, Qt.AlignVCenter)
+        self.upd.hide()
+        lay.addWidget(self.upd)
+
         hero, hl = self.card((24, 20, 24, 20))
         top = QHBoxLayout()
         top.setSpacing(12)
@@ -861,6 +875,16 @@ class ControlPanel:
         self.hero_dot.set_tone(tone)
         self.set_text(self.hero_title, title)
         self.set_text(self.hero_sub, sub)
+
+        up = st.get("update") or {}
+        if up.get("version") and up.get("url", "").startswith("https://github.com/"):
+            self.upd_url = up["url"]
+            self.set_text(self.upd_text, f"Subtle {up['version']} is available. You have {st.get('version', '')}. "
+                                         "Download it, then run Install Subtle.bat again (your models stay).")
+            if self.upd.isHidden():
+                self.upd.show()
+        elif not self.upd.isHidden():
+            self.upd.hide()
 
         d = st.get("delay") or {}
         n = d.get("count", 0)
@@ -1383,6 +1407,8 @@ class ControlPanel:
         self.setting_row(al, "Show this window when Subtle starts", "Otherwise it starts quietly in the tray.", self.open_start)
         self.scan_lms = Toggle(c, lambda v: self.save(scan_lmstudio=v))
         self.setting_row(al, "Use LM Studio's models", "Translator models you downloaded with LM Studio are used without copying.", self.scan_lms)
+        self.check_upd = Toggle(c, lambda v: self.save(check_updates=v))
+        self.setting_row(al, "Tell me about new versions", "Once a day Subtle asks GitHub for the newest version number. Nothing else is sent.", self.check_upd)
         lay.addWidget(ac)
 
         self.section(lay, "Files and logs")
@@ -1423,6 +1449,7 @@ class ControlPanel:
             self.fill_combo(cb, choices, want if any(v == want for v, _ in choices) else "auto")
         self.open_start.set_value(s.get("open_panel_on_start", True))
         self.scan_lms.set_value(s.get("scan_lmstudio", True))
+        self.check_upd.set_value(s.get("check_updates", True))
         self.auto.set_value(self.st.get("autostart"))
 
     def toggle_autostart(self, on):

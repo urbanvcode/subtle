@@ -719,6 +719,11 @@ class Session:
     async def emit(self, job: Job, src: str, text: str, ms: int, speaker: int | None = None):
         msg = {"type": "sub", "text": text, "src": src, "final": job.final, "id": job.seg_id,
                "ms": ms, "t": round(job.end_t, 3)}
+        if job.final and text:
+            # for subtitle files (.srt/.vtt): how long the line was spoken, and how much audio has played
+            # since it ended, so the page can place it on the video's own clock
+            msg["dur"] = round(job.frames * FRAME_S, 2)
+            msg["age"] = round(max(0.0, self.samples / SR - job.end_t), 2)
         if speaker is not None:
             msg["speaker"] = speaker
         await self.send(msg)

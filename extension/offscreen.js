@@ -38,7 +38,7 @@ function connect() {
     } catch {
       return;
     }
-    if (msg.type === "sub" || msg.type === "clear") {
+    if (msg.type === "sub" || msg.type === "clear" || msg.type === "summary") {
       chrome.runtime.sendMessage({ cmd: msg.type, data: msg }).catch(() => {});
     } else if (msg.type === "status") {
       // Model loading, LLM problems, etc.
@@ -122,6 +122,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (msg.cmd === "start") await start(msg.streamId, msg.serverUrl, msg.config, msg.source);
       else if (msg.cmd === "stop") await stop();
       else if (msg.cmd === "control") control(msg.type);
+      else if (msg.cmd === "summary") {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "summary", minutes: msg.minutes || 5 }));
+        else chrome.runtime.sendMessage({ cmd: "summary", data: { type: "summary", error: "Subtle isn't connected right now." } }).catch(() => {});
+      }
       else if (msg.cmd === "config") {
         config = msg.config || config;
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "config", ...config }));

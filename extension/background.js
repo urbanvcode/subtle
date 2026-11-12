@@ -210,6 +210,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case "clear":
         toTab(state.tabId, { type: "clear" });
         break;
+      case "summary": // from the offscreen document: the app's answer to "Catch me up"
+        toTab(state.tabId, { type: "summary", ...msg.data }, state.subFrame ?? 0);
+        break;
+      case "catch-up": // the popup's button
+        await catchUp(msg.tabId);
+        break;
 
       // From content scripts: video play / pause / seek in the captured tab
       case "video":
@@ -271,9 +277,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return ANSWERED.has(msg.cmd); // keep sendResponse alive for the async handler, only when it will answer
 });
 
-// Keyboard shortcut (Alt+Shift+S) counts as a user gesture, so capture can start from here.
+// "Catch me up": the Subtle app summarises the last few minutes; the answer is shown on the video.
+async function catchUp(tabId) {
+  const state = await getState();
+  if (state.tabId === null) {
+    if (tabId !== undefined && tabId !== null) {
+      await injectContent(tabId);
+      toTab(tabId, { type: "summary", error: "Start subtitles first: Subtle summarises what it has heard." });
+    }
+    return;
+  }
+  toTab(state.tabId, { type: "summary", pending: true }, state.subFrame ?? 0);
+  chrome.runtime.sendMessage({ target: "offscreen", cmd: "summary", minutes: 5 }).catch(() => {});
+}
+
+// Keyboard shortcuts. Alt+Shift+S counts as a user gesture, so capture can start from here.
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (command !== "toggle-subs" || !tab) return;
+  if (!tab) return;
+  if (command === "catch-up") return catchUp(tab.id);
+  if (command === "hide-subs" || command === "repeat-line") {
+    const state = await getState();
+    const target = state.tabId ?? tab.id;
+    toTab(target, { type: "hotkey", action: command === "hide-subs" ? "hide" : "repeat" },
+      state.tabId !== null ? state.subFrame ?? 0 : 0);
+    return;
+  }
+  if (command !== "toggle-subs") return;
   const state = await getState();
   if (state.tabId === tab.id) return stop();
   try {

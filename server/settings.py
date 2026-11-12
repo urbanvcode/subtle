@@ -30,6 +30,7 @@ DEFAULTS = {
     "asr_default_other": "auto",
     # App
     "open_panel_on_start": True,
+    "check_updates": True,               # once a day: ask GitHub for the newest Subtle version (nothing else is sent)
     "first_run_done": False,
     "scan_lmstudio": True,               # also list .gguf models already downloaded with LM Studio
     "extra_llm_dirs": [],

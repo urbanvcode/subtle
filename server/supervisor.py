@@ -72,6 +72,31 @@ def uses_llm(cfg: dict | None) -> bool:
     return cfg.get("mode") == "llm" or str(cfg.get("target") or "en").lower() != "en"
 
 
+def _version_tuple(v: str) -> tuple:
+    nums = []
+    for part in str(v).lstrip("vV").split("-")[0].split("."):
+        try:
+            nums.append(int(part))
+        except ValueError:
+            nums.append(0)
+    return tuple(nums + [0] * (3 - len(nums)))
+
+
+def check_update() -> dict | None:
+    """{"version", "url"} if GitHub has a newer release, {} if this is the newest, None if unknown."""
+    try:
+        req = urllib.request.Request(Supervisor.RELEASES_URL, headers={
+            "User-Agent": f"Subtle/{VERSION}", "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        tag = str(data.get("tag_name") or "")
+        if tag and _version_tuple(tag) > _version_tuple(VERSION):
+            return {"version": tag.lstrip("vV"), "url": str(data.get("html_url") or "https://github.com/ddsaamir/subtle/releases/latest")}
+        return {}
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------------------------
 # Engine process (server.py)
 # ---------------------------------------------------------------------------------------------
@@ -187,6 +212,55 @@ class Tab:
         # right now still gets its subtitle); anything older would only show up late, so it's dropped.
         self.pending: collections.deque[bytes] = collections.deque()
         self.pending_bytes = 0
+        # Finished lines of the last minutes, for "Catch me up" (memory only, gone with the tab).
+        self.history: collections.deque[tuple[float, str]] = collections.deque(maxlen=400)
+        self.summarizing = False
+
+    def remember_line(self, raw: str):
+        try:
+            msg = json.loads(raw)
+        except ValueError:
+            return
+        if msg.get("final") and msg.get("text"):
+            self.history.append((time.monotonic(), str(msg["text"])))
+
+    # Prompts stay inside the translator's small context (2048 tokens): about 1200 tokens of lines.
+    SUMMARY_CHARS = {"ja": 1100, "zh": 1100, "ko": 1300}
+
+    async def summarize(self, minutes: float):
+        if self.summarizing:
+            return
+        self.summarizing = True
+        try:
+            cutoff = time.monotonic() - max(1.0, min(30.0, minutes)) * 60
+            lines = [t for at, t in self.history if at >= cutoff]
+            target = str((self.config or {}).get("target") or "en").lower()
+            budget = self.SUMMARY_CHARS.get(target, 4000)
+            picked, used = [], 0
+            for line in reversed(lines):                  # the newest lines matter most
+                if used + len(line) > budget:
+                    break
+                picked.append(line)
+                used += len(line) + 1
+            picked.reverse()
+            if len(picked) < 3:
+                await self.send({"type": "summary", "error": "Not much has been said yet - try again in a minute."})
+                return
+            url, model_id, err = await self.sup.ensure_llm(str((self.config or {}).get("llm_model") or ""))
+            if err or not url:
+                await self.send({"type": "summary", "error": err or "No translator model - download one on the Models page."})
+                return
+            self.sup.last_llm_use = time.monotonic()
+            t0 = time.perf_counter()
+            text = await asyncio.to_thread(llm_client.llm_summary, url, model_id, picked, target)
+            self.sup.last_llm_use = time.monotonic()
+            log(f"[summary] {len(picked)} lines summarised in {time.perf_counter() - t0:.1f}s")
+            await self.send({"type": "summary", "text": text or "(nothing to summarise)", "lines": len(picked)})
+        except Exception as e:
+            log(f"[summary] {type(e).__name__}: {e}")
+            await self.send({"type": "summary", "error": f"The translator could not make a summary ({type(e).__name__})."})
+        finally:
+            self.summarizing = False
 
     async def send(self, obj):
         async with self.send_lock:
@@ -228,6 +302,8 @@ class Tab:
                 elif kind == "info":
                     self.sup.prewarm()          # the popup is open: Start is probably next
                     await self.send(await self.sup.info())
+                elif kind == "summary":         # "Catch me up"
+                    self.summary_task = asyncio.create_task(self.summarize(float(msg.get("minutes") or 5)))
                 elif kind == "config":
                     self.config = msg
                     self.sup.touch(self)
@@ -334,6 +410,8 @@ class Tab:
                 await self.send(m)
                 if isinstance(m, str) and m.startswith('{"type": "sub"'):
                     self.measure_delay(m)
+                    if '"final": true' in m:
+                        self.remember_line(m)
         except ConnectionClosed:
             pass
         finally:
@@ -367,6 +445,7 @@ class Supervisor:
         self.ui = None                 # the control panel window (ui.ControlPanel), if any
         self.stop_event: asyncio.Event | None = None
         self.downloader = downloads.Downloader(on_change=self._downloads_changed)
+        self.update_info: dict | None = None      # {"version", "url"} when GitHub has a newer Subtle
         self.hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
         self.origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
 
@@ -412,6 +491,25 @@ class Supervisor:
             elif self.llama.pid() and now - max(self.last_llm_use, self.llama.started_at) > limit:
                 log(f"[idle] translator unused for {minutes} min - stopping it")
                 await self.llama.stop()
+
+    # -- update notice ---------------------------------------------------------------------------
+    RELEASES_URL = "https://api.github.com/repos/ddsaamir/subtle/releases/latest"
+
+    async def update_loop(self):
+        """Once a day, ask GitHub which Subtle version is the newest (if "check_updates" is on). Only that
+        one request is made: no account, no IDs, nothing about what you watch."""
+        await asyncio.sleep(20)                   # not during start-up
+        while True:
+            if self.settings.get("check_updates", True):
+                info = await asyncio.to_thread(check_update)
+                if info is not None:
+                    changed = info != self.update_info
+                    self.update_info = info
+                    if changed:
+                        if info.get("version"):
+                            log(f"[update] Subtle {info['version']} is available: {info['url']}")
+                        await self.push_state()
+            await asyncio.sleep(24 * 3600)
 
     async def unload(self):
         for tab in list(self.tabs):
@@ -490,7 +588,8 @@ class Supervisor:
                 "asr_models": asr, "asr_loaded": self.engine.loaded, "llm_models": llms, "llm_error": llm_error,
                 "llm_default": self.pick_llm("")[0] if s.get("llm_backend") != "external" else s.get("llm_model", ""),
                 "gpu": gpu.get("name", "CPU"), "backend": s.get("llm_backend"),
-                "panel_url": f"http://127.0.0.1:{self.port}/"}
+                "panel_url": f"http://127.0.0.1:{self.port}/",
+                "update": self.update_info if s.get("check_updates", True) else None}
 
     async def gpu_info(self) -> dict:
         if time.monotonic() - self.gpu_at > 4.0:      # nvidia-smi is a process start: not every refresh
@@ -543,7 +642,7 @@ class Supervisor:
               "usage": await self.usage_cached(), "engine": self.engine.snapshot(),
               "translator": self.llama.snapshot(), "tabs": len(self.tabs), "downloads": self.downloader.status(),
               "idle_for": round(time.monotonic() - self.last_audio) if self.last_audio else None,
-              "delay": self.delay_stats()}
+              "delay": self.delay_stats(), "update": self.update_info if self.settings.get("check_updates", True) else None}
         if full:
             st["models"] = await asyncio.to_thread(self.models)
             have = {"whisper": {w["name"].lower() for w in st["models"]["whisper"]},
@@ -748,7 +847,8 @@ class Supervisor:
                              max_size=2**22, compression=None):
                 log(f"[subtle] v{VERSION} running (extension connects to ws://127.0.0.1:{self.port})")
                 self.ready.set()
-                tasks = [asyncio.create_task(self.idle_loop()), asyncio.create_task(self.state_loop())]
+                tasks = [asyncio.create_task(self.idle_loop()), asyncio.create_task(self.state_loop()),
+                         asyncio.create_task(self.update_loop())]
                 await self.stop_event.wait()
                 for t in tasks:
                     t.cancel()

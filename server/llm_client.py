@@ -168,6 +168,34 @@ def list_llm_models(base_url: str) -> list[str]:
     return [i for i in ids if i and "embed" not in i.lower()]
 
 
+def llm_summary(base_url: str, model: str, lines: list[str], language: str, timeout: float = 90) -> str:
+    """"Catch me up": a few short bullet points about what was said in `lines` (subtitles, oldest first)."""
+    name = lang_name(language)
+    system = (
+        f"You help a viewer who missed part of a video. Read its subtitles and tell them, in {name}, what "
+        f"happened and what it was about: 2 to 4 short bullet points starting with '- ', in order, at most 70 "
+        f"words in total. Summarise in your own words, like a friend explaining it: who wants what, what was "
+        f"decided, what changed. Do not quote or copy the lines. Use only what is in the subtitles and never "
+        f"invent names or events. Subtitles can contain recognition mistakes: ignore lines that make no sense. "
+        f"No heading, no introduction."
+    )
+    body = {
+        "model": model,
+        "temperature": 0,
+        "max_tokens": 240,
+        "stream": False,
+        "messages": [{"role": "system", "content": system},
+                     {"role": "user", "content": "Subtitles of the last few minutes:\n" + "\n".join(lines)}],
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    data = _http_json(base_url.rstrip("/") + "/chat/completions", body, timeout=timeout)
+    out = data["choices"][0]["message"].get("content") or ""
+    out = THINK.sub("", out).strip()
+    if "</think>" in out:
+        out = out.split("</think>")[-1].strip()
+    return out
+
+
 def llm_translate(base_url: str, model: str, text: str, source: str | None, target: str,
                   context: list[tuple[str, str]], timeout: float = 20, call: LLMCall | None = None) -> str:
     src_name, tgt_name = lang_name(source), lang_name(target)

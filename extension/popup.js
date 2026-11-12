@@ -110,6 +110,62 @@ async function toggle() {
   refreshStatus();
 }
 
+// ---- Catch me up / Save subtitles --------------------------------------------------
+function toolHint(text, err = false) {
+  const el = $("toolHint");
+  el.textContent = text;
+  el.className = "hint" + (err ? " err" : "") + (text ? "" : " hidden");
+}
+
+const pad = (n, w = 2) => String(n).padStart(w, "0");
+function stamp(sec, sep) {
+  const ms = Math.round(sec * 1000);
+  return `${pad(Math.floor(ms / 3600000))}:${pad(Math.floor(ms / 60000) % 60)}:${pad(Math.floor(ms / 1000) % 60)}${sep}${pad(ms % 1000, 3)}`;
+}
+
+// Lines in time order, each kept on screen until shortly before the next one (2-7 s, by length).
+function tidyCues(cues) {
+  const list = [...cues].sort((a, b) => a.start - b.start);
+  return list.map((c, i) => {
+    const next = list[i + 1];
+    const want = Math.min(7, Math.max(2, c.text.length * 0.07));
+    let end = Math.max(c.end + 0.6, c.start + want);
+    if (next) end = Math.min(end, Math.max(c.start + 0.5, next.start - 0.05));
+    return { ...c, end };
+  });
+}
+
+function buildSubtitleFile(cues, fmt, withOriginal) {
+  const lines = tidyCues(cues).map((c, i) => {
+    const text = withOriginal && c.src && c.src !== c.text ? `${c.text}\n${c.src}` : c.text;
+    const sep = fmt === "vtt" ? "." : ",";
+    const head = fmt === "vtt" ? "" : `${i + 1}\n`;
+    return `${head}${stamp(c.start, sep)} --> ${stamp(c.end, sep)}\n${text}\n`;
+  });
+  return (fmt === "vtt" ? "WEBVTT\n\n" : "") + lines.join("\n");
+}
+
+async function saveSubtitles(fmt) {
+  let res = null;
+  try {
+    res = await chrome.tabs.sendMessage(tab.id, { type: "get-cues" });
+  } catch {}
+  if (!res || !res.cues || !res.cues.length) {
+    return toolHint("No subtitles on this page yet. Start subtitles and play the video first.", true);
+  }
+  const body = buildSubtitleFile(res.cues, fmt, s.showOriginal);
+  const name = (res.title || "subtitles").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "subtitles";
+  const url = URL.createObjectURL(new Blob(["﻿" + body], { type: fmt === "vtt" ? "text/vtt" : "application/x-subrip" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}.${fmt}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  toolHint(`Saved ${res.cues.length} lines as ${name}.${fmt}` + (s.showOriginal ? " (with the original lines)" : ""));
+}
+
 // ---- model lists from the server -------------------------------------------------
 function fetchInfo() {
   return new Promise((resolve) => {
@@ -220,8 +276,11 @@ function renderVersion() {
   } else if (info.version !== VERSION) {
     v.textContent = `Extension v${VERSION} · app v${info.version || "?"} - versions differ: quit and restart Subtle from the tray (and reload the extension if it's older)`;
     v.className = "hint err";
+  } else if (info.update && info.update.version) {
+    v.textContent = `Subtle v${VERSION} · version ${info.update.version} is available on GitHub (see the Subtle app)`;
+    v.className = "hint";
   } else {
-    v.textContent = `Subtle v${VERSION} · server v${info.version} · up to date`;
+    v.textContent = `Subtle v${VERSION}`;
     v.className = "hint";
   }
   if (info && info.transcript_dir) $("transcriptHint").textContent = `Saved as text files in ${info.transcript_dir}. Off: nothing is written to disk.`;
@@ -413,6 +472,12 @@ async function init() {
     } catch {}
   };
   $("toggle").onclick = toggle;
+  $("catchUp").onclick = async () => {
+    await chrome.runtime.sendMessage({ cmd: "catch-up", tabId: tab.id }).catch(() => {});
+    window.close(); // the summary appears on the video
+  };
+  $("saveSubs").onclick = () => $("saveRow").classList.toggle("hidden");
+  for (const b of document.querySelectorAll(".fmt")) b.onclick = () => saveSubtitles(b.dataset.fmt);
   initStyle();
   $("size").addEventListener("input", renderPreview);
   $("original").addEventListener("change", renderPreview);

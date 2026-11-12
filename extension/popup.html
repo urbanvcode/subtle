@@ -177,6 +177,19 @@
   details.more[open] summary .chev { transform: rotate(90deg); }
   details.more .inner { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 
+  /* Catch me up / Save subtitles */
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tool { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 10px;
+    border-radius: 9px; border: 1px solid var(--line); background: var(--field); font-size: 12.5px; cursor: pointer;
+    color: var(--fg); white-space: nowrap; }
+  .tool:hover { background: var(--field-hover); }
+  .tool svg { width: 15px; height: 15px; color: var(--accent); }
+  .saverow { display: flex; align-items: center; gap: 8px; margin-top: -4px; }
+  .saverow .lbl { font-size: 12px; color: var(--muted); margin-right: auto; }
+  .fmt { height: 28px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent-soft);
+    color: var(--fg); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .fmt:hover { filter: brightness(1.08); }
+
   footer { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 2px 4px 4px; }
   footer .hint { margin: 0; }
   kbd { font: 10.5px ui-monospace, Consolas, monospace; padding: 1px 5px; border: 1px solid var(--line);
@@ -197,6 +210,20 @@
   <section class="card">
     <div id="status" class="status"><i></i><span id="statusText">Not running</span></div>
     <button id="toggle" class="main"></button>
+    <div class="tools">
+      <button id="catchUp" class="tool" title="A short summary of the last few minutes, shown on the video (Alt+Shift+U)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+        Catch me up</button>
+      <button id="saveSubs" class="tool" title="Save this video's subtitles as a file that works in VLC and other players">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        Save subtitles</button>
+    </div>
+    <div id="saveRow" class="saverow hidden">
+      <span class="lbl">Format</span>
+      <button class="fmt" data-fmt="srt">.srt</button>
+      <button class="fmt" data-fmt="vtt">.vtt</button>
+    </div>
+    <p id="toolHint" class="hint hidden"></p>
     <label class="opt">
       <span class="txt"><b>Auto-start when a video plays</b>
         <small>No click needed on most sites. Protected (DRM) players show ▶ on the icon: click it once.</small></span>
@@ -313,6 +340,8 @@
 
   <footer>
     <p class="hint">Start/stop anywhere: <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>S</kbd></p>
+    <p class="hint"><kbd>H</kbd> hide · <kbd>L</kbd> last line again · <kbd>U</kbd> catch me up (with <kbd>Alt</kbd> <kbd>Shift</kbd>)</p>
+    <p class="hint">Drag the subtitles on the video to move them; double-click puts them back.</p>
     <p id="version" class="hint"></p>
   </footer>
 </div>
