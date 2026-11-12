@@ -4,8 +4,15 @@
 const SERVER = "ws://127.0.0.1:8765";
 const $ = (id) => document.getElementById(id);
 
-function launch() {
-  location.assign("subtle://open"); // the page stays; the browser hands the link to Windows
+// A page may only open an outside app right after a click on it, so the extension asks the browser to
+// open the link in this tab instead (as if typed in the address bar): the browser asks "Open Subtle?"
+// and the page stays. The Start Subtle link on the page is the fallback (a click is always allowed).
+async function launch() {
+  try {
+    const me = await chrome.tabs.getCurrent();
+    if (me && me.id != null) return void (await chrome.tabs.update(me.id, { url: "subtle://open" }));
+  } catch {}
+  location.assign("subtle://open");
 }
 
 function tryConnect() {
@@ -45,13 +52,18 @@ async function wait() {
     await new Promise((r) => setTimeout(r, 1000));
   }
   $("msg").innerHTML =
-    "Subtle didn't start. Start it from the <b>Subtle</b> shortcut on the desktop or in the Start menu " +
-    "(on Linux or macOS: <code>subtle.sh</code> in the Subtle folder), then press Try again.";
+    "Subtle didn't start. Press <b>Start Subtle</b>, or start it from the <b>Subtle</b> shortcut on the desktop " +
+    "or in the Start menu (on Linux or macOS: <code>subtle.sh</code> in the Subtle folder).";
+  waiting = false;
 }
 
-$("again").onclick = () => {
-  launch();
+let waiting = false;
+function waitOnce() {
+  if (waiting) return;
+  waiting = true;
   wait();
-};
+}
+
+$("again").onclick = waitOnce; // the link itself starts Subtle; keep watching for it
 launch();
-wait();
+waitOnce();

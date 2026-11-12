@@ -14,15 +14,17 @@
   h1 img { width: 28px; height: 28px; }
   p { margin: 8px 0 0; color: var(--muted); }
   .ok { color: var(--accent); }
-  button { margin-top: 16px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line);
-    background: var(--card); color: var(--fg); font: inherit; font-size: 13.5px; cursor: pointer; }
+  .btn { display: inline-flex; align-items: center; margin-top: 16px; height: 36px; padding: 0 16px; border-radius: 9px;
+    background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; text-decoration: none; }
+  .btn:hover { filter: brightness(1.08); }
 </style>
 </head>
 <body>
   <div class="card">
     <h1><img src="icons/icon48.png" alt="">Starting Subtle…</h1>
-    <p id="msg">If your browser asks whether to open Subtle, choose <b>Open</b> (tick <i>Always allow</i> to skip this next time).</p>
-    <button id="again">Try again</button>
+    <p id="msg">If your browser asks whether to open Subtle, choose <b>Open</b> (tick <i>Always allow</i> to skip this next time).
+      Nothing happens? Press <b>Start Subtle</b>.</p>
+    <a id="again" class="btn" href="subtle://open">Start Subtle</a>
   </div>
 <script src="launch.js"></script>
 </body>
