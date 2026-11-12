@@ -14,3 +14,4 @@ models/*/*
 !models/*/READ ME.txt
 *.partial
 edition.txt
+extension-firefox/

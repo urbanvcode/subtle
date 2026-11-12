@@ -134,6 +134,8 @@ def main():
                 for item in src.infolist():
                     if lite and item.filename.startswith("Subtle/docs/"):
                         continue          # screenshots for the GitHub page only
+                    if item.filename.startswith("Subtle/extension-firefox/"):
+                        continue          # generated below (never from the repository)
                     dst.writestr(item, src.read(item.filename))
                 for rel, data in ff.items():
                     dst.writestr(f"Subtle/extension-firefox/{rel}", data)
