@@ -226,14 +226,18 @@
     if (!v) return elementFailed("no-video");
     if (v.mediaKeys) return elementFailed("drm");
     let stream;
+    // Firefox only has mozCaptureStream, which takes the sound away from the speakers (it is played
+    // back below) and can't feed an AudioContext running at another rate (resampled by hand below).
+    const moz = !v.captureStream && !!v.mozCaptureStream;
     try {
       stream = (v.captureStream || v.mozCaptureStream).call(v);
     } catch (e) {
       return elementFailed("blocked");
     }
     const port = chrome.runtime.connect({ name: "subtle-audio" });
-    const ctx = new AudioContext({ sampleRate: 16000 });
-    const st = { video: v, stream, ctx, src: null, node: null, port, zeroFrames: 0 };
+    const ctx = moz ? new AudioContext() : new AudioContext({ sampleRate: 16000 });
+    const st = { video: v, stream, ctx, src: null, node: null, port, zeroFrames: 0,
+      ratio: ctx.sampleRate / 16000, t: 0, prev: 0, acc: new Float32Array(4096), accN: 0 };
     ecap = st;
     video = v;
     port.onDisconnect.addListener(() => {
@@ -244,7 +248,7 @@
       st.src = ctx.createMediaStreamSource(stream);
       // ScriptProcessor (not a worklet): worklets load a script file, which some sites' security
       // policies block. 512 samples at 16 kHz = 32 ms, the same chunks the tab capture sends.
-      st.node = ctx.createScriptProcessor(512, 2, 1);
+      st.node = ctx.createScriptProcessor(moz ? 2048 : 512, 2, 1);
       st.node.onaudioprocess = (e) => {
         if (ecap !== st) return;
         const inp = e.inputBuffer;
@@ -258,9 +262,27 @@
         for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(out[i]));
         // Media the page may play but not read (cross-origin) comes through as exact silence.
         if (peak === 0 && !v.paused && !v.muted && v.volume > 0) {
-          if (++st.zeroFrames > 190) return elementFailed("silent"); // ~6 s of digital silence
+          if (++st.zeroFrames > 190 / (n / 512)) return elementFailed("silent"); // ~6 s of digital silence
         } else st.zeroFrames = 0;
-        const bytes = new Uint8Array(out.buffer);
+        if (st.ratio === 1) return postChunk(out);
+        // Resample to 16 kHz (linear; t is the position in this block, -1..0 = the previous block's last sample)
+        let t = st.t;
+        while (t < n - 1) {
+          const i = Math.floor(t);
+          const f = t - i;
+          const a = i < 0 ? st.prev : out[i];
+          st.acc[st.accN++] = a + (out[i + 1] - a) * f;
+          if (st.accN === 512) {
+            postChunk(st.acc.slice(0, 512));
+            st.accN = 0;
+          }
+          t += st.ratio;
+        }
+        st.t = t - n;
+        st.prev = out[n - 1];
+      };
+      const postChunk = (chunk) => {
+        const bytes = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
         let bin = "";
         for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
         try {
@@ -271,6 +293,7 @@
       };
       st.src.connect(st.node);
       st.node.connect(ctx.destination); // needed for it to run; it outputs silence, the page plays the sound
+      if (moz) st.src.connect(ctx.destination); // Firefox: the captured video is silent, so play it here
     };
     stream.addEventListener("addtrack", attach);
     attach();
@@ -796,6 +819,7 @@
       case "element-start": {
         scan();
         const v = video && !video.paused ? video : pickVideo();
+        if (!v && msg.any) break; // started by hand: another frame has the video
         startElementCapture(v);
         break;
       }

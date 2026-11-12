@@ -2,6 +2,15 @@
 // the popup, the offscreen capture document and the content scripts.
 
 const OFFSCREEN_URL = "offscreen.html";
+// Firefox has no offscreen documents and no tab capture: offscreen.js runs in this background page,
+// and subtitles always come from the page's own video (in-page capture).
+const FIREFOX = !chrome.offscreen;
+
+function toOffscreen(msg) {
+  const m = { target: "offscreen", ...msg };
+  if (globalThis.__subtleOffscreen) return globalThis.__subtleOffscreen(m);
+  return chrome.runtime.sendMessage(m);
+}
 const DEFAULTS = {
   serverUrl: "ws://127.0.0.1:8765",
   language: "ja",
@@ -72,6 +81,11 @@ const userStopped = new Set(); // tabs where the user stopped subtitles: no auto
 async function hintClick(tabId, reason) {
   needsClick.add(tabId);
   const why = reason === "drm" ? "protected (DRM) video" : "this player's audio can't be read directly";
+  if (FIREFOX) {
+    // no tab capture in Firefox: there is nothing to click
+    await chrome.action.setTitle({ tabId, title: `Subtle can't subtitle this video in Firefox - ${why}` }).catch(() => {});
+    return;
+  }
   await chrome.action.setBadgeText({ tabId, text: "▶" }).catch(() => {});
   await chrome.action.setBadgeBackgroundColor({ tabId, color: "#e0a400" }).catch(() => {});
   await chrome.action
@@ -87,12 +101,26 @@ async function startElement(tabId, frameId) {
   const config = await serverConfig(tab && tab.title);
   await ensureOffscreen();
   await setState({ tabId, status: "connecting", detail: "", subFrame: frameId, source: "element", elementLive: false });
-  await chrome.runtime.sendMessage({ target: "offscreen", cmd: "start", serverUrl, config, source: "element" });
+  await toOffscreen({ cmd: "start", serverUrl, config, source: "element" });
   toTab(tabId, { type: "active", active: true });
-  toTab(tabId, { type: "element-start" }, frameId);
+  if (frameId === null || frameId === undefined) {
+    // Started by hand (Firefox): whichever frame has the video takes it.
+    await injectContent(tabId);
+    toTab(tabId, { type: "active", active: true });
+    toTab(tabId, { type: "element-start", any: true });
+    setTimeout(async () => {
+      const st = await getState();
+      if (st.tabId === tabId && st.source === "element" && !st.elementLive) {
+        await setState({ status: "error", detail: "No video with sound found on this page. Play the video, then try again." });
+      }
+    }, 6000);
+  } else {
+    toTab(tabId, { type: "element-start" }, frameId);
+  }
 }
 
 async function ensureOffscreen() {
+  if (FIREFOX) return;
   const contexts = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] });
   if (contexts.length) return;
   await chrome.offscreen.createDocument({
@@ -103,6 +131,7 @@ async function ensureOffscreen() {
 }
 
 async function closeOffscreen() {
+  if (FIREFOX) return;
   const contexts = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] });
   if (contexts.length) await chrome.offscreen.closeDocument();
 }
@@ -151,7 +180,7 @@ async function start(tabId, streamId) {
   needsClick.delete(tabId);
   userStopped.delete(tabId);
   await setState({ tabId, status: "connecting", detail: "", subFrame: null, source: "tab" });
-  await chrome.runtime.sendMessage({ target: "offscreen", cmd: "start", streamId, serverUrl, config });
+  await toOffscreen({ cmd: "start", streamId, serverUrl, config });
   await injectContent(tabId);
   toTab(tabId, { type: "active", active: true });
   toTab(tabId, { type: "query" }); // content script reports whether the video is playing
@@ -161,7 +190,7 @@ async function stop(byUser = true) {
   const { tabId, source } = await getState();
   if (source === "element") toTab(tabId, { type: "element-stop" });
   try {
-    await chrome.runtime.sendMessage({ target: "offscreen", cmd: "stop" });
+    await toOffscreen({ cmd: "stop" });
   } catch {}
   await closeOffscreen();
   toTab(tabId, { type: "active", active: false });
@@ -174,14 +203,15 @@ async function stop(byUser = true) {
 
 const ANSWERED = new Set(["start", "stop", "status", "am-i-active"]); // commands that get a response
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+function handleMessage(msg, sender, sendResponse) {
   if (msg.target === "offscreen") return; // meant for the offscreen document
 
   (async () => {
     const state = await getState();
     switch (msg.cmd) {
       case "start":
-        await start(msg.tabId, msg.streamId);
+        if (FIREFOX || !msg.streamId) await startElement(msg.tabId, null);
+        else await start(msg.tabId, msg.streamId);
         sendResponse({ ok: true });
         break;
       case "stop":
@@ -219,7 +249,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       case "define-word": // learning mode: a word was clicked on the video
         if (sender.tab && sender.tab.id === state.tabId) {
-          chrome.runtime.sendMessage({ target: "offscreen", cmd: "define", word: msg.word, surface: msg.surface, reading: msg.reading, context: msg.context }).catch(() => {});
+          toOffscreen({ cmd: "define", word: msg.word, surface: msg.surface, reading: msg.reading, context: msg.context }).catch(() => {});
         }
         break;
       case "define": // from the offscreen document: the app's answer
@@ -241,7 +271,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           } else if (known && sender.frameId !== state.subFrame) {
             break; // pause / seek of a video in another frame (an ad, a preview), not the one being subtitled
           }
-          chrome.runtime.sendMessage({ target: "offscreen", cmd: "control", type: msg.event }).catch(() => {});
+          toOffscreen({ cmd: "control", type: msg.event }).catch(() => {});
         }
         break;
       case "fullscreen":
@@ -287,7 +317,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
   })();
   return ANSWERED.has(msg.cmd); // keep sendResponse alive for the async handler, only when it will answer
-});
+}
+chrome.runtime.onMessage.addListener(handleMessage);
+globalThis.__subtleBackground = (msg) => {
+  handleMessage(msg, {}, () => {});
+};
 
 // "Catch me up": the Subtle app summarises the last few minutes; the answer is shown on the video.
 async function catchUp(tabId) {
@@ -300,7 +334,7 @@ async function catchUp(tabId) {
     return;
   }
   toTab(state.tabId, { type: "summary", pending: true }, state.subFrame ?? 0);
-  chrome.runtime.sendMessage({ target: "offscreen", cmd: "summary", minutes: 5 }).catch(() => {});
+  toOffscreen({ cmd: "summary", minutes: 5 }).catch(() => {});
 }
 
 // Keyboard shortcuts. Alt+Shift+S counts as a user gesture, so capture can start from here.
@@ -317,6 +351,7 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   if (command !== "toggle-subs") return;
   const state = await getState();
   if (state.tabId === tab.id) return stop();
+  if (FIREFOX) return startElement(tab.id, null);
   try {
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
     await start(tab.id, streamId);
@@ -329,7 +364,7 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "sync" || !CONFIG_KEYS.some((k) => k in changes)) return;
   if ((await getState()).tabId === null) return;
-  chrome.runtime.sendMessage({ target: "offscreen", cmd: "config", config: await serverConfig() }).catch(() => {});
+  toOffscreen({ cmd: "config", config: await serverConfig() }).catch(() => {});
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {

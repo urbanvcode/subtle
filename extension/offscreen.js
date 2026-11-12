@@ -3,6 +3,8 @@
 // from the page's own <video> instead (sent here by the content script over a port). Subtitles come back here and
 // are forwarded to the service worker, which sends them to the tab.
 
+// In Firefox this file shares the background page with background.js: keep its names to itself.
+(() => {
 let stream = null;
 let playCtx = null;     // plays the tab audio back to the speakers (capture mutes the tab)
 let capCtx = null;      // 16 kHz context feeding the worklet
@@ -13,8 +15,16 @@ let running = false;
 let paused = false;
 let reconnectTimer = null;
 
+// Chrome: this is the offscreen document and talks to the service worker with messages.
+// Firefox (no offscreen documents): this file runs inside the background page, next to background.js,
+// and the two call each other directly (a page doesn't receive its own runtime messages).
+function toBackground(msg) {
+  if (globalThis.__subtleBackground) return globalThis.__subtleBackground(msg);
+  return chrome.runtime.sendMessage(msg).catch(() => {});
+}
+
 function status(s, detail = "") {
-  chrome.runtime.sendMessage({ cmd: "capture-status", status: s, detail }).catch(() => {});
+  toBackground({ cmd: "capture-status", status: s, detail });
 }
 
 function connect() {
@@ -39,7 +49,7 @@ function connect() {
       return;
     }
     if (msg.type === "sub" || msg.type === "clear" || msg.type === "summary" || msg.type === "define") {
-      chrome.runtime.sendMessage({ cmd: msg.type, data: msg }).catch(() => {});
+      toBackground({ cmd: msg.type, data: msg });
     } else if (msg.type === "status") {
       // Model loading, LLM problems, etc.
       const s = msg.level === "error" ? "error" : msg.level === "busy" ? "connecting" : "live";
@@ -115,9 +125,7 @@ function control(type) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type }));
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.target !== "offscreen") return;
-  (async () => {
+async function handleOffscreen(msg) {
     try {
       if (msg.cmd === "start") await start(msg.streamId, msg.serverUrl, msg.config, msg.source);
       else if (msg.cmd === "stop") await stop();
@@ -126,25 +134,30 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "define", word: msg.word, surface: msg.surface, reading: msg.reading, context: msg.context }));
       } else if (msg.cmd === "summary") {
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "summary", minutes: msg.minutes || 5 }));
-        else chrome.runtime.sendMessage({ cmd: "summary", data: { type: "summary", error: "Subtle isn't connected right now." } }).catch(() => {});
+        else toBackground({ cmd: "summary", data: { type: "summary", error: "Subtle isn't connected right now." } });
       }
       else if (msg.cmd === "config") {
         config = msg.config || config;
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "config", ...config }));
       }
-      sendResponse({ ok: true });
+      return { ok: true };
     } catch (e) {
       status("error", String(e.message || e));
-      sendResponse({ ok: false, error: String(e.message || e) });
+      return { ok: false, error: String(e.message || e) };
     }
-  })();
+}
+globalThis.__subtleOffscreen = handleOffscreen;
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.target !== "offscreen") return;
+  handleOffscreen(msg).then(sendResponse);
   return true;
 });
 
 // Auto-start: 32 ms chunks of the page video's audio (base64 float32) from the content script.
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "subtle-audio") return;
-  chrome.runtime.sendMessage({ cmd: "element-live", live: true }).catch(() => {});
+  toBackground({ cmd: "element-live", live: true });
   port.onMessage.addListener((b64) => {
     if (!running || typeof b64 !== "string") return;
     const bin = atob(b64);
@@ -153,6 +166,7 @@ chrome.runtime.onConnect.addListener((port) => {
     sendAudio(bytes.buffer);
   });
   port.onDisconnect.addListener(() => {
-    chrome.runtime.sendMessage({ cmd: "element-live", live: false }).catch(() => {});
+    toBackground({ cmd: "element-live", live: false });
   });
 });
+})();

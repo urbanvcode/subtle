@@ -100,6 +100,12 @@ async function toggle() {
     await chrome.runtime.sendMessage({ cmd: "stop" });
   } else {
     try {
+      if (!chrome.tabCapture) {
+        // Firefox: no tab capture; the background starts the in-page capture of the video
+        await chrome.runtime.sendMessage({ cmd: "start", tabId: tab.id });
+        refreshStatus();
+        return;
+      }
       // Must be called from the popup (a user gesture) for tab capture to be allowed.
       const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
       await chrome.runtime.sendMessage({ cmd: "start", tabId: tab.id, streamId });
