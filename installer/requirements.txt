@@ -1,0 +1,17 @@
+# Subtle's Python packages, pinned to the versions it was tested with.
+# torch / torchaudio are installed first from the PyTorch index that matches the GPU (install.ps1);
+# they are listed here too so nothing below can replace them.
+torch==2.14.1
+torchaudio==2.11.0
+# Whisper is loaded by Subtle's own code (server/whisper_core.py): it only needs these two.
+safetensors==0.8.0
+tokenizers==0.23.3
+numpy==2.5.4
+websockets==17.4
+silero-vad==6.2.3
+onnxruntime==1.31.1
+psutil==7.2.2
+pystray==0.19.5
+pillow==13.0.0
+# The Subtle window (Qt draws the whole window at once: smooth resizing, ~33 MB of RAM)
+PySide6-Essentials==6.12.0

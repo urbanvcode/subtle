@@ -1,0 +1,147 @@
+"""Small Windows helpers for the supervisor (no-ops elsewhere)."""
+
+import ctypes
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
+
+
+class ChildJob:
+    """
+    A Windows job object that the supervisor's child processes (engine, llama-server) are put in.
+    When the supervisor exits for any reason, even a crash, Windows closes the job and kills them,
+    so no orphan is ever left holding VRAM.
+    """
+
+    def __init__(self):
+        self.handle = None
+        if sys.platform != "win32":
+            return
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreateJobObjectW.restype = ctypes.c_void_p
+        k32.OpenProcess.restype = ctypes.c_void_p
+        self.k32 = k32
+        job = k32.CreateJobObjectW(None, None)
+        if not job:
+            return
+
+        class IO_COUNTERS(ctypes.Structure):
+            _fields_ = [(n, ctypes.c_ulonglong) for n in
+                        ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                         "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+        class BASIC(ctypes.Structure):
+            _fields_ = [("PerProcessUserTimeLimit", ctypes.c_longlong), ("PerJobUserTimeLimit", ctypes.c_longlong),
+                        ("LimitFlags", ctypes.c_uint32), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                        ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", ctypes.c_uint32),
+                        ("Affinity", ctypes.c_size_t), ("PriorityClass", ctypes.c_uint32),
+                        ("SchedulingClass", ctypes.c_uint32)]
+
+        class EXTENDED(ctypes.Structure):
+            _fields_ = [("BasicLimitInformation", BASIC), ("IoInfo", IO_COUNTERS),
+                        ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                        ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        info = EXTENDED()
+        info.BasicLimitInformation.LimitFlags = 0x2000          # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        ok = k32.SetInformationJobObject(ctypes.c_void_p(job), 9, ctypes.byref(info), ctypes.sizeof(info))
+        if ok:
+            self.handle = job
+
+    def add(self, proc: subprocess.Popen):
+        if self.handle is None:
+            return
+        try:
+            h = int(proc._handle)                                 # Popen keeps the process handle on Windows
+            self.k32.AssignProcessToJobObject(ctypes.c_void_p(self.handle), ctypes.c_void_p(h))
+        except Exception:
+            pass
+
+
+def process_tree(pid: int | None) -> list[int]:
+    """pid and all its descendants. (A venv's python.exe on Windows is a launcher that runs the real
+    interpreter as a child, so the memory and the work are in the child.)"""
+    if not pid:
+        return []
+    try:
+        import psutil
+        p = psutil.Process(pid)
+        return [pid] + [c.pid for c in p.children(recursive=True)]
+    except Exception:
+        return [pid]
+
+
+def kill_tree(proc: subprocess.Popen, timeout: float = 5.0):
+    """Stop a child process and everything it started (blocking; call from a thread)."""
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        import psutil
+        parent = psutil.Process(proc.pid)
+        kids = parent.children(recursive=True)
+    except Exception:
+        kids = []
+    for k in kids:
+        try:
+            k.terminate()
+        except Exception:
+            pass
+    proc.terminate()
+    try:
+        proc.wait(timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+    for k in kids:
+        try:
+            k.wait(timeout)
+        except Exception:
+            try:
+                k.kill()
+            except Exception:
+                pass
+
+
+def console_python() -> str:
+    """python.exe next to the running interpreter (the tray runs under pythonw.exe)."""
+    exe = Path(sys.executable)
+    if exe.name.lower() == "pythonw.exe" and (exe.parent / "python.exe").is_file():
+        return str(exe.parent / "python.exe")
+    return str(exe)
+
+
+def windowless_python() -> str:
+    exe = Path(sys.executable)
+    w = exe.parent / "pythonw.exe"
+    return str(w) if w.is_file() else str(exe)
+
+
+def startup_shortcut() -> Path:
+    return Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Subtle.lnk"
+
+
+def make_shortcut(link: Path, target: str, args: str, workdir: str, icon: str = "") -> bool:
+    """Create a .lnk with Windows' own shell object (via PowerShell, no extra packages)."""
+    def q(s: str) -> str:
+        return s.replace("'", "''")
+    ps = (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{q(str(link))}');"
+          f"$s.TargetPath='{q(target)}';$s.Arguments='{q(args)}';$s.WorkingDirectory='{q(workdir)}';"
+          + (f"$s.IconLocation='{q(icon)}';" if icon else "") + "$s.Save()")
+    try:
+        link.parent.mkdir(parents=True, exist_ok=True)
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                           capture_output=True, timeout=20, creationflags=NO_WINDOW)
+        return r.returncode == 0 and link.exists()
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def open_path(path) -> bool:
+    try:
+        Path(path).mkdir(parents=True, exist_ok=True) if not Path(path).suffix else None
+        os.startfile(str(path))          # Explorer / default app; local only
+        return True
+    except (OSError, AttributeError):
+        return False

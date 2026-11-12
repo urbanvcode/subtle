@@ -1,0 +1,7 @@
+Speech models (Whisper) go here, one folder per model.
+
+The easiest way is the Models page of the Subtle window (Download button).
+To add one yourself, download a Whisper model from huggingface.co in the Transformers
+format and put its whole folder here, e.g.
+    models\whisper\whisper-large-v3\config.json, model.safetensors, tokenizer.json, ...
+Then press Rescan on the Models page.

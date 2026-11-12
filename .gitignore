@@ -1,0 +1,15 @@
+# local data - never commit
+transcripts/
+logs/
+settings.json
+__pycache__/
+.venv/
+
+# created by Install Subtle.bat
+runtime/
+bin/
+
+# models are downloaded from the control panel (only the catalog and the READ ME files are kept)
+models/*/*
+!models/*/READ ME.txt
+*.partial

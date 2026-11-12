@@ -1,0 +1,688 @@
+{
+ "version": 1,
+ "models": [
+  {
+   "id": "whisper-large-v3",
+   "kind": "whisper",
+   "name": "Whisper large-v3",
+   "repo": "openai/whisper-large-v3",
+   "revision": "06f233fe06e710322aca913c1bc4249a0d71fce1",
+   "target": "whisper-large-v3",
+   "files": [
+    {
+     "name": "added_tokens.json",
+     "size": 34648,
+     "sha256": null
+    },
+    {
+     "name": "config.json",
+     "size": 1272,
+     "sha256": null
+    },
+    {
+     "name": "generation_config.json",
+     "size": 3903,
+     "sha256": null
+    },
+    {
+     "name": "merges.txt",
+     "size": 493869,
+     "sha256": null
+    },
+    {
+     "name": "model.safetensors",
+     "size": 3087130976,
+     "sha256": "a8e94b85976e5864ba3e9525c7e6c83b2a1eca42d4b797a0c7c24d778e40fd95"
+    },
+    {
+     "name": "normalizer.json",
+     "size": 52666,
+     "sha256": null
+    },
+    {
+     "name": "preprocessor_config.json",
+     "size": 340,
+     "sha256": null
+    },
+    {
+     "name": "special_tokens_map.json",
+     "size": 2072,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer.json",
+     "size": 2480617,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer_config.json",
+     "size": 282843,
+     "sha256": null
+    },
+    {
+     "name": "vocab.json",
+     "size": 1036558,
+     "sha256": null
+    }
+   ],
+   "size": 3091519764,
+   "vram_mb": 3900,
+   "min_gpu_gb": 6,
+   "roles": [
+    "fast",
+    "best"
+   ],
+   "note": "The most accurate Whisper, and the one that translates straight to English (Fast engine). Any language.",
+   "license": "apache-2.0"
+  },
+  {
+   "id": "whisper-large-v3-turbo",
+   "kind": "whisper",
+   "name": "Whisper large-v3 turbo",
+   "repo": "openai/whisper-large-v3-turbo",
+   "revision": "41f01f3fe87f28c78e2fbf8b568835947dd65ed9",
+   "target": "whisper-large-v3-turbo",
+   "files": [
+    {
+     "name": "added_tokens.json",
+     "size": 34648,
+     "sha256": null
+    },
+    {
+     "name": "config.json",
+     "size": 1256,
+     "sha256": null
+    },
+    {
+     "name": "generation_config.json",
+     "size": 3772,
+     "sha256": null
+    },
+    {
+     "name": "merges.txt",
+     "size": 493869,
+     "sha256": null
+    },
+    {
+     "name": "model.safetensors",
+     "size": 1617824864,
+     "sha256": "542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1"
+    },
+    {
+     "name": "normalizer.json",
+     "size": 52666,
+     "sha256": null
+    },
+    {
+     "name": "preprocessor_config.json",
+     "size": 340,
+     "sha256": null
+    },
+    {
+     "name": "special_tokens_map.json",
+     "size": 2186,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer.json",
+     "size": 2710337,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer_config.json",
+     "size": 282843,
+     "sha256": null
+    },
+    {
+     "name": "vocab.json",
+     "size": 1036558,
+     "sha256": null
+    }
+   ],
+   "size": 1622443339,
+   "vram_mb": 2000,
+   "min_gpu_gb": 4,
+   "roles": [
+    "best"
+   ],
+   "note": "Half the memory and faster. Writes down speech for the Best engine; cannot translate by itself. Any language.",
+   "license": "mit"
+  },
+  {
+   "id": "whisper-medium",
+   "kind": "whisper",
+   "name": "Whisper medium",
+   "repo": "openai/whisper-medium",
+   "revision": "abdf7c39ab9d0397620ccaea8974cc764cd0953e",
+   "target": "whisper-medium",
+   "files": [
+    {
+     "name": "added_tokens.json",
+     "size": 34604,
+     "sha256": null
+    },
+    {
+     "name": "config.json",
+     "size": 1991,
+     "sha256": null
+    },
+    {
+     "name": "generation_config.json",
+     "size": 3755,
+     "sha256": null
+    },
+    {
+     "name": "merges.txt",
+     "size": 493869,
+     "sha256": null
+    },
+    {
+     "name": "model.safetensors",
+     "size": 3055544304,
+     "sha256": "62f73550fa6db24b0c6f6c5962bd0dae80fa644e93cde9cd9c3792971b47fd28"
+    },
+    {
+     "name": "normalizer.json",
+     "size": 52666,
+     "sha256": null
+    },
+    {
+     "name": "preprocessor_config.json",
+     "size": 184990,
+     "sha256": null
+    },
+    {
+     "name": "special_tokens_map.json",
+     "size": 2194,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer.json",
+     "size": 2480466,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer_config.json",
+     "size": 282683,
+     "sha256": null
+    },
+    {
+     "name": "vocab.json",
+     "size": 835550,
+     "sha256": null
+    }
+   ],
+   "size": 3059917072,
+   "vram_mb": 1700,
+   "min_gpu_gb": 4,
+   "roles": [
+    "fast",
+    "best"
+   ],
+   "note": "For GPUs with 4 GB. Less accurate than large-v3.",
+   "license": "apache-2.0"
+  },
+  {
+   "id": "whisper-small",
+   "kind": "whisper",
+   "name": "Whisper small",
+   "repo": "openai/whisper-small",
+   "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+   "target": "whisper-small",
+   "files": [
+    {
+     "name": "added_tokens.json",
+     "size": 34604,
+     "sha256": null
+    },
+    {
+     "name": "config.json",
+     "size": 1967,
+     "sha256": null
+    },
+    {
+     "name": "generation_config.json",
+     "size": 3868,
+     "sha256": null
+    },
+    {
+     "name": "merges.txt",
+     "size": 493869,
+     "sha256": null
+    },
+    {
+     "name": "model.safetensors",
+     "size": 966995080,
+     "sha256": "1d7734884874f1a1513ed9aa760a4f8e97aaa02fd6d93a3a85d27b2ae9ca596b"
+    },
+    {
+     "name": "normalizer.json",
+     "size": 52666,
+     "sha256": null
+    },
+    {
+     "name": "preprocessor_config.json",
+     "size": 184990,
+     "sha256": null
+    },
+    {
+     "name": "special_tokens_map.json",
+     "size": 2194,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer.json",
+     "size": 2480466,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer_config.json",
+     "size": 282683,
+     "sha256": null
+    },
+    {
+     "name": "vocab.json",
+     "size": 835550,
+     "sha256": null
+    }
+   ],
+   "size": 971367937,
+   "vram_mb": 700,
+   "min_gpu_gb": 2,
+   "roles": [
+    "fast",
+    "best"
+   ],
+   "note": "For very small GPUs or no GPU. Noticeably less accurate.",
+   "license": "apache-2.0"
+  },
+  {
+   "id": "Qwen3.5-2B-Q4_K_M",
+   "kind": "llm",
+   "name": "Qwen3.5 2B",
+   "repo": "lmstudio-community/Qwen3.5-2B-GGUF",
+   "revision": "bb84e11355a036e28f080c7793fa6d22b7c4e344",
+   "target": "Qwen3.5-2B-Q4_K_M.gguf",
+   "files": [
+    {
+     "name": "Qwen3.5-2B-Q4_K_M.gguf",
+     "size": 1270808032,
+     "sha256": "0bfe35afc9f05b7fac3fa04925e051ac7939a42a8a17ea11afc99701bea826cc"
+    }
+   ],
+   "size": 1270808032,
+   "vram_mb": 1700,
+   "min_gpu_gb": 6,
+   "roles": [
+    "best"
+   ],
+   "note": "Smallest translator, for 6 GB GPUs. In our test a little less accurate than Qwen3 4B and no faster: choose it for its low memory.",
+   "license": "apache-2.0"
+  },
+  {
+   "id": "Qwen3-4B-Instruct-2507-Q4_K_M",
+   "kind": "llm",
+   "name": "Qwen3 4B Instruct 2507",
+   "repo": "lmstudio-community/Qwen3-4B-Instruct-2507-GGUF",
+   "revision": "4edb920b6f14e3b9284d4502a6485103d72cde05",
+   "target": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+   "files": [
+    {
+     "name": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+     "size": 2497280448,
+     "sha256": "8cdb57cbb880d313736a9bc4e3d3d2485f145b5e19cf33783746e753e82641fc"
+    }
+   ],
+   "size": 2497280448,
+   "vram_mb": 2900,
+   "min_gpu_gb": 8,
+   "roles": [
+    "best"
+   ],
+   "note": "Recommended. The best translations among the small translators we measured, for every subtitle language.",
+   "license": "apache-2.0"
+  },
+  {
+   "id": "Qwen3.5-9B-Q4_K_M",
+   "kind": "llm",
+   "name": "Qwen3.5 9B",
+   "repo": "lmstudio-community/Qwen3.5-9B-GGUF",
+   "revision": "1379f25c6b505a3fc737bd7818cb09389cf807c1",
+   "target": "Qwen3.5-9B-Q4_K_M.gguf",
+   "files": [
+    {
+     "name": "Qwen3.5-9B-Q4_K_M.gguf",
+     "size": 5627044256,
+     "sha256": "cd76ec205963b3b33350093e6904d9de16c4e666fd104e1f632d25c7f15f2a13"
+    }
+   ],
+   "size": 5627044256,
+   "vram_mb": 6200,
+   "min_gpu_gb": 12,
+   "roles": [
+    "best"
+   ],
+   "note": "A bigger translator for 12 GB GPUs. Not part of our benchmark.",
+   "license": "apache-2.0"
+  },
+  {
+   "id": "gemma-4-12B-it-QAT-Q4_0",
+   "kind": "llm",
+   "name": "Gemma 4 12B (QAT)",
+   "repo": "lmstudio-community/gemma-4-12B-it-QAT-GGUF",
+   "revision": "aaec3dd9d1012557147a627142759994d1fd8d37",
+   "target": "gemma-4-12B-it-QAT-Q4_0.gguf",
+   "files": [
+    {
+     "name": "gemma-4-12B-it-QAT-Q4_0.gguf",
+     "size": 6975879008,
+     "sha256": "f568ac5de71c8fcac5d5794494388ad94db9e18b4368ca897e21b30d2448eeec"
+    }
+   ],
+   "size": 6975879008,
+   "vram_mb": 7600,
+   "min_gpu_gb": 16,
+   "roles": [
+    "best"
+   ],
+   "note": "A big translator for 16 GB GPUs and up. Not part of our benchmark.",
+   "license": "apache-2.0"
+  },
+  {
+   "id": "wespeaker-resnet34",
+   "kind": "speaker",
+   "name": "Speaker voiceprints (WeSpeaker ResNet34)",
+   "repo": "Wespeaker/wespeaker-voxceleb-resnet34-LM",
+   "revision": "f0c48c298fd835726c27956a5d617bad7115627e",
+   "target": "voxceleb_resnet34_LM.onnx",
+   "files": [
+    {
+     "name": "voxceleb_resnet34_LM.onnx",
+     "size": 26530309,
+     "sha256": "7bb2f06e9df17cdf1ef14ee8a15ab08ed28e8d0ef5054ee135741560df2ec068"
+    }
+   ],
+   "size": 26530309,
+   "vram_mb": 100,
+   "min_gpu_gb": 0,
+   "roles": [
+    "speakers"
+   ],
+   "note": "Needed only for 'Identify speakers'.",
+   "license": "cc-by-4.0"
+  },
+  {
+   "id": "sensevoice-small",
+   "kind": "whisper",
+   "name": "SenseVoice Small (Chinese)",
+   "repo": "FunAudioLLM/SenseVoiceSmall",
+   "revision": "3847d57b6bdf2dd8875cb1508d2af43d80a16bf7",
+   "target": "sensevoice-small",
+   "files": [
+    {
+     "name": "am.mvn",
+     "size": 11203,
+     "sha256": "29b3c740a2c0cfc6b308126d31d7f265fa2be74f3bb095cd2f143ea970896ae5"
+    },
+    {
+     "name": "chn_jpn_yue_eng_ko_spectok.bpe.model",
+     "size": 377341,
+     "sha256": "aa87f86064c3730d799ddf7af3c04659151102cba548bce325cf06ba4da4e6a8"
+    },
+    {
+     "name": "model.pt",
+     "size": 936291369,
+     "sha256": "833ca2dcfdf8ec91bd4f31cfac36d6124e0c459074d5e909aec9cabe6204a3ea"
+    }
+   ],
+   "size": 936679913,
+   "vram_mb": 1100,
+   "min_gpu_gb": 4,
+   "roles": [
+    "best"
+   ],
+   "note": "Best for Chinese with the Best engine: 9.3 % wrong characters on test sentences against 11.7 % for Whisper turbo, and about seven times as fast (it reads a whole line in one pass). Used automatically for Chinese. Also knows Cantonese, English, Japanese and Korean, where Whisper and Parakeet did better. Transcribes; can't translate by itself. By FunAudioLLM (Alibaba). Keeps 0.5 GB on disk after its first use.",
+   "license": "FunASR Model License"
+  },
+  {
+   "id": "parakeet-tdt_ctc-0.6b-ja",
+   "kind": "whisper",
+   "name": "Parakeet 0.6B (Japanese)",
+   "repo": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+   "revision": "44edb27eea9317daf89333e75eb830db4b1cc298",
+   "target": "parakeet-tdt_ctc-0.6b-ja",
+   "files": [
+    {
+     "name": "parakeet-tdt_ctc-0.6b-ja.nemo",
+     "size": 2490951680,
+     "sha256": "a2ed2aab9c82cce4e9b699dca669184d7525c7b5e1eb8c3f7b789421bc3637e8"
+    }
+   ],
+   "size": 2490951680,
+   "vram_mb": 1400,
+   "min_gpu_gb": 4,
+   "roles": [
+    "best"
+   ],
+   "note": "Best for Japanese with the Best engine: 6.2 % wrong characters on test sentences against 7.0 % for Whisper turbo, and about six times as fast (it reads a whole line in one pass). Used automatically for Japanese. Japanese only. Transcribes; can't translate by itself. By NVIDIA. Keeps 1.2 GB on disk after its first use.",
+   "license": "cc-by-4.0",
+   "language": "ja"
+  },
+  {
+   "id": "kotoba-whisper-v2.0",
+   "kind": "whisper",
+   "name": "Kotoba-Whisper v2.0 (Japanese)",
+   "repo": "kotoba-tech/kotoba-whisper-v2.0",
+   "revision": "7eb575277d18909a4af8a24e3ae8cce2e99794ae",
+   "target": "kotoba-whisper-v2.0",
+   "files": [
+    {
+     "name": "added_tokens.json",
+     "size": 34648,
+     "sha256": null
+    },
+    {
+     "name": "config.json",
+     "size": 1287,
+     "sha256": null
+    },
+    {
+     "name": "generation_config.json",
+     "size": 3898,
+     "sha256": null
+    },
+    {
+     "name": "merges.txt",
+     "size": 493869,
+     "sha256": null
+    },
+    {
+     "name": "model.safetensors",
+     "size": 1512875008,
+     "sha256": "0a96a84e307bbb90128a9fd5a45b4f803be212aadef633e24c088fa1ba30f727"
+    },
+    {
+     "name": "normalizer.json",
+     "size": 52666,
+     "sha256": null
+    },
+    {
+     "name": "preprocessor_config.json",
+     "size": 340,
+     "sha256": null
+    },
+    {
+     "name": "special_tokens_map.json",
+     "size": 2186,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer.json",
+     "size": 2481381,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer_config.json",
+     "size": 282863,
+     "sha256": null
+    },
+    {
+     "name": "vocab.json",
+     "size": 835528,
+     "sha256": null
+    }
+   ],
+   "size": 1517063674,
+   "vram_mb": 1700,
+   "min_gpu_gb": 4,
+   "roles": [
+    "best"
+   ],
+   "note": "Japanese only. A smaller Whisper trained on Japanese TV speech. On our read-aloud test sentences it was faster than Whisper turbo but less accurate (8.4 % against 7.0 % wrong characters); it may suit TV shows better than that test shows. Transcribes; can't translate by itself.",
+   "license": "apache-2.0",
+   "language": "ja",
+   "experimental": true
+  },
+  {
+   "id": "anime-whisper",
+   "kind": "whisper",
+   "name": "Anime-Whisper (Japanese)",
+   "repo": "litagin/anime-whisper",
+   "revision": "22e2008a8182b357da3922a6308d095008f72973",
+   "target": "anime-whisper",
+   "files": [
+    {
+     "name": "added_tokens.json",
+     "size": 34648,
+     "sha256": null
+    },
+    {
+     "name": "config.json",
+     "size": 1268,
+     "sha256": null
+    },
+    {
+     "name": "generation_config.json",
+     "size": 3898,
+     "sha256": null
+    },
+    {
+     "name": "merges.txt",
+     "size": 493869,
+     "sha256": null
+    },
+    {
+     "name": "model.safetensors",
+     "size": 3025686376,
+     "sha256": "15c672f0bf687b1c67aa14325f9c382c6919f1fce976f990513618b464a3c626"
+    },
+    {
+     "name": "normalizer.json",
+     "size": 52666,
+     "sha256": null
+    },
+    {
+     "name": "preprocessor_config.json",
+     "size": 340,
+     "sha256": null
+    },
+    {
+     "name": "special_tokens_map.json",
+     "size": 2186,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer_config.json",
+     "size": 282863,
+     "sha256": null
+    },
+    {
+     "name": "vocab.json",
+     "size": 1036558,
+     "sha256": null
+    }
+   ],
+   "size": 3027594672,
+   "vram_mb": 1700,
+   "min_gpu_gb": 4,
+   "roles": [
+    "best"
+   ],
+   "note": "Japanese only. Trained on anime and game voice acting (fast, emotional, shouted or whispered lines). On our read-aloud test sentences it was less accurate than Whisper turbo (10.3 % against 7.0 %); that test is not the kind of speech it was made for. Transcribes; can't translate by itself.",
+   "license": "mit",
+   "language": "ja",
+   "experimental": true
+  },
+  {
+   "id": "kotoba-whisper-bilingual-v1.0",
+   "kind": "whisper",
+   "name": "Kotoba-Whisper Bilingual (Japanese/English)",
+   "repo": "kotoba-tech/kotoba-whisper-bilingual-v1.0",
+   "revision": "5b2c01ec5bc234cd784e9187e74bc86582ed5944",
+   "target": "kotoba-whisper-bilingual-v1.0",
+   "files": [
+    {
+     "name": "added_tokens.json",
+     "size": 34648,
+     "sha256": null
+    },
+    {
+     "name": "config.json",
+     "size": 1268,
+     "sha256": null
+    },
+    {
+     "name": "generation_config.json",
+     "size": 3898,
+     "sha256": null
+    },
+    {
+     "name": "merges.txt",
+     "size": 493869,
+     "sha256": null
+    },
+    {
+     "name": "model.safetensors",
+     "size": 1512875008,
+     "sha256": "b3a7c08e4dfe000c70015f0d538cbcc3773785cc5b817e7b48fde4182206800c"
+    },
+    {
+     "name": "normalizer.json",
+     "size": 52666,
+     "sha256": null
+    },
+    {
+     "name": "preprocessor_config.json",
+     "size": 340,
+     "sha256": null
+    },
+    {
+     "name": "special_tokens_map.json",
+     "size": 2186,
+     "sha256": null
+    },
+    {
+     "name": "tokenizer_config.json",
+     "size": 282843,
+     "sha256": null
+    },
+    {
+     "name": "vocab.json",
+     "size": 1036558,
+     "sha256": null
+    }
+   ],
+   "size": 1514783284,
+   "vram_mb": 1700,
+   "min_gpu_gb": 4,
+   "roles": [
+    "fast",
+    "best"
+   ],
+   "note": "Japanese speech straight to English for the Fast engine, in under half the time and memory of Whisper large-v3 and with almost the same quality on our test sentences. Pick it in the popup; it is not used automatically.",
+   "license": "apache-2.0",
+   "language": "ja",
+   "experimental": true
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+Translator models (for the 'Best' engine) go here as .gguf files.
+
+The easiest way is the Models page of the Subtle window (Download button).
+Any instruct/chat model in GGUF format works, e.g. Qwen3-4B-Instruct-2507-Q4_K_M.gguf.
+Smaller files use less video memory (VRAM). Then press Rescan on the Models page.

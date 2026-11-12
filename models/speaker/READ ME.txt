@@ -1,0 +1,3 @@
+Voiceprint model for 'Identify speakers' goes here:
+    voxceleb_resnet34_LM.onnx  (26.5 MB, from Wespeaker/wespeaker-voxceleb-resnet34-LM on huggingface.co)
+The Models page of the Subtle window can download it for you.
