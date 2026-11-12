@@ -1,0 +1,37 @@
+{
+ "note": "Pinned downloads for install.sh (Linux and macOS). Windows uses versions.json.",
+ "python": "3.12",
+ "uv": {
+  "version": "0.13.7",
+  "linux-x64": {"url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-unknown-linux-gnu.tar.gz", "size": 16671812, "sha256": "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"},
+  "linux-arm64": {"url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-unknown-linux-gnu.tar.gz", "size": 15896996, "sha256": "71279f8d3c67241e807b9d8db872d1bf541579fb9f08b7d1eb1682196d1e57dc"},
+  "macos-arm64": {"url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-apple-darwin.tar.gz", "size": 14347867, "sha256": "81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731"}
+ },
+ "torch_index": {
+  "linux-cuda13": "https://download.pytorch.org/whl/cu130",
+  "linux-cuda12": "https://download.pytorch.org/whl/cu126",
+  "linux-rocm": "https://download.pytorch.org/whl/rocm7.2",
+  "linux-vulkan": "https://download.pytorch.org/whl/cpu",
+  "linux-cpu": "https://download.pytorch.org/whl/cpu",
+  "macos-arm64": "https://pypi.org/simple"
+ },
+ "llama_cpp": {
+  "build": "b12317",
+  "variants": {
+   "linux-cuda13": {"note": "NVIDIA, driver 580 or newer", "files": [
+    {"name": "llama-b12317-bin-ubuntu-cuda-13.5-x64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/llama-b12317-bin-ubuntu-cuda-13.5-x64.tar.gz", "size": 176931202, "sha256": "f78e642cb9b4a694a8ac8a864741238dcf4e61fa2e029f5b8f659633c331709a"},
+    {"name": "cudart-llama-b12317-bin-ubuntu-cuda-13.5-x64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/cudart-llama-b12317-bin-ubuntu-cuda-13.5-x64.tar.gz", "size": 444078989, "sha256": "da597a61b1965446791297a4f0d89cc1f0c1c4454d5f02e25d9791a32290b5d7"}]},
+   "linux-cuda12": {"note": "NVIDIA, older drivers (CUDA 12.8)", "files": [
+    {"name": "llama-b12317-bin-ubuntu-cuda-12.8-x64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/llama-b12317-bin-ubuntu-cuda-12.8-x64.tar.gz", "size": 198035813, "sha256": "c872818ef519140e2dd003765668fbd852446c224a29e95d086847d9733fe2c9"},
+    {"name": "cudart-llama-b12317-bin-ubuntu-cuda-12.8-x64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/cudart-llama-b12317-bin-ubuntu-cuda-12.8-x64.tar.gz", "size": 594371572, "sha256": "fc9aeae93fea730e4c3fb9c813b9dbaf50acbadd6d9177a94cc7f4460e53a074"}]},
+   "linux-rocm": {"note": "AMD (Experimental)", "files": [
+    {"name": "llama-b12317-bin-ubuntu-rocm-10.0-x64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/llama-b12317-bin-ubuntu-rocm-10.0-x64.tar.gz", "size": 270775661, "sha256": "ef8f7a0b38c9942b210a08cb5da5d10ad7799d7c632ab13b2bff358f7b911f92"}]},
+   "linux-vulkan": {"note": "Intel and other GPUs (Experimental)", "files": [
+    {"name": "llama-b12317-bin-ubuntu-vulkan-x64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/llama-b12317-bin-ubuntu-vulkan-x64.tar.gz", "size": 36126080, "sha256": "b2eaef4559b3815228b6115fc11204b323a42a3d2139c975add2922509ee33ae"}]},
+   "linux-cpu": {"note": "no GPU", "files": [
+    {"name": "llama-b12317-bin-ubuntu-x64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/llama-b12317-bin-ubuntu-x64.tar.gz", "size": 23310881, "sha256": "8c9287285c949ba03bc39065221dd10e741e85508208af96b5c1ba5b9d5761e3"}]},
+   "macos-arm64": {"note": "Apple M-series (Experimental)", "files": [
+    {"name": "llama-b12317-bin-macos-arm64.tar.gz", "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12317/llama-b12317-bin-macos-arm64.tar.gz", "size": 16896114, "sha256": "ac453373fa09110df9edab032a00936dd834f85421c5333cb3a1ff9cbdc410ea"}]}
+  }
+ }
+}

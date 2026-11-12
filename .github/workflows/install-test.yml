@@ -1,0 +1,40 @@
+name: Install test
+
+# Runs the real installer on clean Linux and macOS machines (no GPU there: the CPU / Apple paths),
+# then downloads a small model and checks that Subtle starts and transcribes.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "benchmarks/**", "**.md"]
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Subtle
+        run: ./install.sh --gpu cpu
+      - name: Check Subtle
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: runtime/venv/bin/python installer/ci_check.py
+      - name: Install log
+        if: failure()
+        run: cat logs/install.log || true
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Subtle
+        run: ./install.sh
+      - name: Check Subtle
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: runtime/venv/bin/python installer/ci_check.py
+      - name: Install log
+        if: failure()
+        run: cat logs/install.log || true
