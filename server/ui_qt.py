@@ -1501,10 +1501,10 @@ class ControlPanel:
         b.addSpacing(4)
         b.addLayout(r)
 
-        b, _, _ = self._step(lay, 2, "Add Subtle to your browser (Brave or Chrome)")
-        self._numbered(b, 1, "Open a new browser tab and go to  brave://extensions   (Chrome: chrome://extensions)",
-                       self.button("Copy address", lambda: self.copy("brave://extensions"), small=True))
-        self._numbered(b, 2, "Turn on Developer mode (switch at the top right).")
+        b, _, _ = self._step(lay, 2, "Add Subtle to your browser (Chrome, Edge, Brave, Opera, Vivaldi or another Chromium browser)")
+        self._numbered(b, 1, "Open a new browser tab and go to  chrome://extensions   (works in every Chromium browser)",
+                       self.button("Copy address", lambda: self.copy("chrome://extensions"), small=True))
+        self._numbered(b, 2, "Turn on Developer mode (a switch at the top right; in Edge it is on the left).")
         self._numbered(b, 3, "Click Load unpacked and choose Subtle's extension folder:")
         pr = QHBoxLayout()
         pr.setContentsMargins(26, 0, 0, 0)
@@ -1516,7 +1516,7 @@ class ControlPanel:
         pr.addWidget(self.button("Open folder", lambda: self.cmd("open", what="extension"), small=True))
         pr.addStretch(1)
         b.addLayout(pr)
-        self._numbered(b, 4, "Optional: on the extension's Details page, turn on Allow in Private.")
+        self._numbered(b, 4, "Optional: on the extension's Details page, turn on Allow in Incognito (Private / InPrivate).")
 
         b, _, _ = self._step(lay, 3, "Watch something")
         for i, text in enumerate((

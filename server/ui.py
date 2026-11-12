@@ -1349,13 +1349,13 @@ class ControlPanel:
         self.setup_dl = self.label(r, "", "small")
         self.setup_dl.pack(side="left", padx=10)
 
-        b, _, _ = self._step(p, 2, "Add Subtle to your browser (Brave or Chrome)")
+        b, _, _ = self._step(p, 2, "Add Subtle to your browser (Chrome, Edge, Brave, Opera, Vivaldi or another Chromium browser)")
         steps = (
-            ("Open a new browser tab and go to  brave://extensions   (Chrome: chrome://extensions)",
-             ("Copy address", lambda: self.copy("brave://extensions"))),
-            ("Turn on Developer mode (switch at the top right).", None),
+            ("Open a new browser tab and go to  chrome://extensions   (works in every Chromium browser)",
+             ("Copy address", lambda: self.copy("chrome://extensions"))),
+            ("Turn on Developer mode (a switch at the top right; in Edge it is on the left).", None),
             ("Click Load unpacked and choose Subtle's extension folder:", None),
-            ("Optional: on the extension's Details page, turn on Allow in Private.", None),
+            ("Optional: on the extension's Details page, turn on Allow in Incognito (Private / InPrivate).", None),
         )
         for i, (text, action) in enumerate(steps, start=1):
             row = tk.Frame(b, bg=c["panel"])

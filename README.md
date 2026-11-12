@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/ddsaamir/subtle/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ddsaamir/subtle?color=2fbf8f"></a>
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4">
-  <img alt="Brave or Chrome" src="https://img.shields.io/badge/browser-Brave%20%7C%20Chrome-555">
+  <img alt="Chrome, Edge, Brave, Opera, Vivaldi" src="https://img.shields.io/badge/browser-Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20Opera%20%7C%20Vivaldi-555">
   <img alt="NVIDIA GPU" src="https://img.shields.io/badge/GPU-NVIDIA%206%20GB%2B-76b900">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
@@ -85,7 +85,7 @@ video in a browser tab ─► Subtle extension ─► Subtle app on your PC ─�
 | | Minimum | Recommended |
 |---|---|---|
 | System | Windows 10 or 11, 64-bit | |
-| Browser | Brave or Chrome | |
+| Browser | Any Chromium browser: **Chrome, Edge, Brave, Opera / Opera GX, Vivaldi**, Arc and others (not Firefox or Safari) | |
 | Graphics card | NVIDIA GTX 16-series / RTX 20-series or newer, **6 GB** video memory | NVIDIA RTX 3060 / 4060 or better, **8 GB+** |
 | Memory (RAM) | 8 GB | 16 GB |
 | Disk | 8 GB + models (2-10 GB) | |
@@ -104,8 +104,9 @@ video in a browser tab ─► Subtle extension ─► Subtle app on your PC ─�
    menu. Nothing is installed system-wide.
 3. The **Subtle window** opens. Follow its **Setup guide**:
    - **Download the recommended models.** It picks them for your graphics card, one click.
-   - **Add the browser extension:** open `brave://extensions` (or `chrome://extensions`), turn on
-     **Developer mode**, click **Load unpacked**, and choose the `extension` folder inside Subtle.
+   - **Add the browser extension:** open `chrome://extensions` in your browser (this address works in
+     Chrome, Edge, Brave, Opera and Vivaldi), turn on **Developer mode** (top right; in Edge it's on the
+     left), click **Load unpacked**, and choose the `extension` folder inside Subtle.
      (The Setup guide has a button that copies the exact path.)
 4. Open a video, click the Subtle icon in the browser toolbar, then **Start subtitles on this tab**
    (or press **Alt+Shift+S**).
@@ -223,7 +224,7 @@ Subtle only uses memory while you're actually watching something with subtitles:
 | Anything else | Subtle window → Settings → **Show activity log**, and the install log in `logs\install.log`. |
 
 **Update:** replace the Subtle files with the new version (keep `models\`, `runtime\` and
-`settings.json`), run `Install Subtle.bat` again, and reload the extension in `brave://extensions`.
+`settings.json`), run `Install Subtle.bat` again, and reload the extension in `chrome://extensions`.
 
 **Uninstall:** quit Subtle (tray icon → Quit), untick "Start with Windows" if you turned it on,
 delete the Subtle folder and the two shortcuts, and remove the extension from the browser.

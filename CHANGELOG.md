@@ -5,6 +5,10 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- The README and the Setup guide now list every supported browser (Chrome, Edge, Brave, Opera,
+  Vivaldi and other Chromium browsers) and use `chrome://extensions`, which works in all of them.
+
 ## [0.5.0] - 2026-11-12
 
 First public release.
