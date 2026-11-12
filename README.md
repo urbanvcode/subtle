@@ -1,15 +1,80 @@
-# Subtle
+<p align="center">
+  <img src="extension/icons/icon128.png" width="84" alt="Subtle icon">
+</p>
 
-**Real-time subtitles and translation for any video in your browser, generated on your own PC.**
+<h1 align="center">Subtle</h1>
 
-Japanese, Chinese, Korean and ~95 other languages, turned into subtitles while you watch, on any
-website. Speech recognition and translation both run locally on your graphics card: nothing you
-watch is sent to the internet.
+<p align="center">
+  <b>Real-time subtitles and translation for any video in your browser, made on your own PC.</b><br>
+  Free, private and offline: nothing you watch leaves your computer.
+</p>
+
+<p align="center">
+  <a href="https://github.com/ddsaamir/subtle/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ddsaamir/subtle?color=2fbf8f"></a>
+  <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4">
+  <img alt="Brave or Chrome" src="https://img.shields.io/badge/browser-Brave%20%7C%20Chrome-555">
+  <img alt="NVIDIA GPU" src="https://img.shields.io/badge/GPU-NVIDIA%206%20GB%2B-76b900">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/demo.jpg" alt="Subtle translating English speech into Spanish subtitles over a film, with the original line underneath" width="100%">
+  <br><sub>Real Subtle output: English speech turned into Spanish subtitles while the film plays, the original line underneath.
+  Frame from <i>Tears of Steel</i>, (CC) Blender Foundation | mango.blender.org.</sub>
+</p>
+
+## What it does
+
+- **Subtitles for any video on any website**: YouTube, streaming sites, anime, lectures, live streams.
+- **Translates while you watch**: Japanese, Chinese, Korean and ~95 other languages into English
+  (or into any language with the Best engine).
+- **Fast**: a line appears about 0.2 s after the speaker stops.
+- **Private**: speech recognition and translation both run on your own graphics card. No account, no
+  cloud, no API keys.
+- **Light**: uses no video memory until you start subtitles, and unloads by itself when you stop.
+- **Easy**: one-click install, a normal Windows app to manage models, and a browser extension with a
+  start button.
+
+## Examples
+
+Real lines from Subtle (English film audio, Best engine, Spanish subtitles), with how long each took
+after the speaker stopped:
+
+| Heard (English) | Subtitle (Spanish) | Delay |
+|---|---|---|
+| Look, Celia, we have to follow our passion. | Mira, Celia, tenemos que seguir nuestra pasión. | 0.2 s |
+| You have your robotics and I just want to be awesome in space. | Tienes tus robóticos y yo solo quiero ser genial en el espacio. | 0.2 s |
+| Why don't you just admit that you're freaked out by my robot hand? | ¿Por qué no admites que te asusta mi mano robótica? | 0.2 s |
+| It's not my fault, you know? | No es mi culpa, ¿sabes? | 0.2 s |
+| Of course you're ready. You're a rock star. | Claro que estás listo. Eres una rock star. | 0.2 s |
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="62%"><img src="docs/images/app-home.png" alt="Subtle app, Home page: status, subtitle delay and memory use"></td>
+    <td><img src="docs/images/popup.png" alt="Browser extension popup: start button, languages, Fast or Best engine"></td>
+  </tr>
+  <tr>
+    <td><b>Subtle app.</b> Status, subtitle delay in milliseconds, and exactly how much memory each part uses.</td>
+    <td><b>Browser extension.</b> One button to start, pick the languages and the engine.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/app-models.png" alt="Models page with recommended downloads for your graphics card"></td>
+    <td><img src="docs/images/popup-style.png" alt="Subtitle style options with live preview"></td>
+  </tr>
+  <tr>
+    <td><b>Models.</b> Recommended models for your graphics card, downloaded with one click.</td>
+    <td><b>Subtitle style.</b> Colours, box, outline and size, with a live preview.</td>
+  </tr>
+</table>
+
+## How it works
 
 ```
 video in a browser tab ─► Subtle extension ─► Subtle app on your PC ─► subtitles over the video
                                               ├─ Fast: Whisper translates straight to English
-                                              └─ Best: Whisper writes the speech down, a built-in
+                                              └─ Best: a speech model writes the speech down, a built-in
                                                        translator model turns it into any language
 ```
 
@@ -33,7 +98,7 @@ video in a browser tab ─► Subtle extension ─► Subtle app on your PC ─�
 
 ## Install (about 10 minutes)
 
-1. **Download Subtle** and unzip it somewhere with free space, e.g. `D:\Subtle`.
+1. **[Download Subtle](https://github.com/ddsaamir/subtle/releases/latest)** (the `.zip` under *Assets*) and unzip it somewhere with free space, e.g. `D:\Subtle`.
 2. **Double-click `Install Subtle.bat`.** It sets up everything inside that folder (a private
    Python, the translator engine) and creates a **Subtle** shortcut on the desktop and in the Start
    menu. Nothing is installed system-wide.
@@ -75,7 +140,7 @@ And by spoken language (Subtle picks these by itself when they are installed):
 | Chinese | Whisper large-v3 | **SenseVoice Small** + translator |
 | Korean and every other language | Whisper large-v3 | Whisper large-v3 turbo + translator |
 
-These come from our own benchmark (120 test sentences per language, cut into lines the way Subtle
+These come from our own benchmark ([`benchmarks/`](benchmarks/), 120 test sentences per language, cut into lines the way Subtle
 cuts them; wrong characters, lower is better):
 
 | | Japanese | Chinese | Korean | Speech step per line |
@@ -182,7 +247,7 @@ delete the Subtle folder and the two shortcuts, and remove the extension from th
 | Part | File | Job |
 |---|---|---|
 | Supervisor | `server/supervisor.py` | Always-on app (no torch, ~40 MB with its window): tray, relays tabs to the engine, starts and stops the engine and translator, idle unload |
-| Window | `server/ui.py`, `server/tray.py` | The Subtle window (Tkinter) and tray icon; they talk to the supervisor in-process |
+| Window | `server/ui_qt.py`, `server/tray.py` | The Subtle window (Qt; `ui.py` is a Tkinter fallback) and tray icon; they talk to the supervisor in-process |
 | Engine | `server/server.py`, `engines.py`, `whisper_core.py`, `parakeet_core.py`, `sensevoice_core.py` | VAD segmentation, previews and finished lines. Whisper, Parakeet and SenseVoice are loaded and run by Subtle's own code (no transformers, NeMo or FunASR): CUDA graphs on the GPU, eager on the CPU. Started on demand by the supervisor |
 | Translator | `server/llm_runner.py`, `llm_client.py` | Runs `bin/llama/llama-server.exe`; any OpenAI-compatible server works as "external" |
 | Models | `server/modelstore.py`, `downloads.py`, `models/catalog.json` | Finds models (models/, HF cache, LM Studio); pinned, checksummed downloads |
@@ -217,4 +282,11 @@ own licenses, shown on the Models page:
 
 Subtle also uses llama.cpp (MIT) for the translator, Silero VAD (MIT) to hear when someone speaks,
 and PyTorch (BSD-3-Clause). The benchmark numbers above were measured on the FLEURS test set
-(Google, CC-BY-4.0).
+(Google, CC-BY-4.0); scripts and full results are in [`benchmarks/`](benchmarks/).
+
+The demo image and example lines use *Tears of Steel* by the Blender Foundation
+(mango.blender.org), CC BY 3.0.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
