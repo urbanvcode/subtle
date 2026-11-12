@@ -328,6 +328,9 @@ class Tab:
                     self.define_task = asyncio.create_task(self.define(
                         str(msg.get("word") or "")[:60], str(msg.get("context") or "")[:400],
                         str(msg.get("surface") or "")[:60], str(msg.get("reading") or "")[:80]))
+                elif kind == "check_update":    # the popup's "Check for updates"
+                    res = await self.sup.check_update_now()
+                    await self.send({"type": "update_check", **res})
                 elif kind == "update":          # the popup's "Update now"
                     await self.sup.update_now()
                     await self.send({"type": "update_started"})
@@ -500,6 +503,7 @@ class Supervisor:
         median = d[n // 2] if n % 2 else (d[n // 2 - 1] + d[n // 2]) / 2
         last, last_compute = self.delays[-1]
         return {"count": n, "last": round(last), "avg": round(sum(d) / n), "median": round(median),
+                "recent": [round(x) for x, _ in list(self.delays)[-48:]],
                 "best": round(d[0]), "worst": round(d[-1]), "compute_last": last_compute,
                 "compute_avg": round(sum(c for _, c in self.delays) / n)}
 
@@ -570,6 +574,15 @@ class Supervisor:
         await self.push_state()
         await asyncio.sleep(0.5)
         self.stop_event.set()                       # quit; apply_update.py starts the new version
+
+    async def check_update_now(self) -> dict:
+        """'Check for updates' (window or popup): ask GitHub now instead of waiting for the daily check."""
+        info = await asyncio.to_thread(check_update)
+        if info is None:
+            return {"error": "Could not reach GitHub. Check the internet connection and try again."}
+        self.update_info = info
+        await self.push_state()
+        return {"ok": True, "update": info or None, "version": VERSION}
 
     # -- update notice ---------------------------------------------------------------------------
     RELEASES_URL = "https://api.github.com/repos/ddsaamir/subtle/releases/latest"
@@ -846,6 +859,8 @@ class Supervisor:
         if cmd == "pc_devices":
             return {"devices": await asyncio.to_thread(pcaudio.output_devices),
                     "programs": await asyncio.to_thread(pcaudio.programs)}
+        if cmd == "check_update":
+            return await self.check_update_now()
         if cmd == "update_now":
             await self.update_now()
             return {"ok": True}

@@ -151,6 +151,54 @@ async function toggle() {
   refreshStatus();
 }
 
+// ---- Check for updates (More tab) ---------------------------------------------------
+function checkUpdates() {
+  const btn = $("checkUpd"), out = $("updText");
+  btn.disabled = true;
+  out.className = "hint";
+  out.textContent = "Checking…";
+  let done = false;
+  const finish = (text, err = false) => {
+    if (done) return;
+    done = true;
+    btn.disabled = false;
+    out.textContent = text;
+    out.className = "hint" + (err ? " err" : "");
+  };
+  try {
+    const ws = new WebSocket(s.serverUrl);
+    ws.onopen = () => ws.send(JSON.stringify({ type: "check_update" }));
+    ws.onmessage = (ev) => {
+      let m;
+      try {
+        m = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
+      if (m.type !== "update_check") return;
+      ws.close();
+      if (m.error) return finish(m.error, true);
+      if (m.update && m.update.version) {
+        finish(`Subtle ${m.update.version} is available.`);
+        if (info) {
+          info.update = m.update;
+          renderVersion();                 // the banner at the top offers Update now
+        }
+      } else finish(`You have the newest version (${m.version || VERSION}).`);
+    };
+    ws.onerror = () => finish("Subtle isn't running - start it first.", true);
+    setTimeout(() => {
+      // an app older than 0.11 doesn't know this question
+      finish("No answer: update the Subtle app once by hand (see the GitHub page).", true);
+      try {
+        ws.close();
+      } catch {}
+    }, 15000);
+  } catch {
+    finish("Subtle isn't running - start it first.", true);
+  }
+}
+
 // ---- Catch me up / Save subtitles --------------------------------------------------
 function toolHint(text, err = false) {
   const el = $("toolHint");
@@ -581,6 +629,7 @@ async function init() {
   };
   $("toggle").onclick = toggle;
   $("summary").onclick = () => showTab("lang");
+  $("checkUpd").onclick = checkUpdates;
   $("catchUp").onclick = async () => {
     await chrome.runtime.sendMessage({ cmd: "catch-up", tabId: tab.id }).catch(() => {});
     window.close(); // the summary appears on the video

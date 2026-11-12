@@ -153,12 +153,12 @@ every change (on the Mac, speech runs on its Apple GPU), but not yet used day to
 
    Either way, everything goes inside that one folder (a private Python, the translator engine), plus
    a **Subtle** shortcut on the desktop and in the Start menu. Nothing is installed system-wide.
-2. The **Subtle window** opens. Follow its **Setup guide**:
+2. The **Subtle window** opens on its **Help** page. Follow the three steps there:
    - **Download the recommended models.** It picks them for your graphics card, one click.
    - **Add the browser extension:** open `chrome://extensions` in your browser (this address works in
      Chrome, Edge, Brave, Opera and Vivaldi), turn on **Developer mode** (top right; in Edge it's on the
      left), click **Load unpacked**, and choose the `extension` folder inside Subtle.
-     (The Setup guide has a button that copies the exact path.)
+     (The Help page has a button that copies the exact path.)
 3. Open a video, click the Subtle icon in the browser toolbar, then **Start subtitles on this tab**
    (or press **Alt+Shift+S**).
 
@@ -197,7 +197,7 @@ itself. That works on YouTube and most players, but not on protected (DRM) sites
 
 ## Which models should I use?
 
-The **Models** page and the Setup guide recommend a set for your graphics card automatically.
+The **Models** page and the Help page recommend a set for your graphics card automatically.
 
 | Your graphics card | Speech (Whisper) | Translator (for Best) | Video memory in use |
 |---|---|---|---|
@@ -240,7 +240,7 @@ guide. With the Best engine the translator adds about 60 ms per line.
   characters) and takes about 6 ms instead of 40 ms for the speech step.
 - Parakeet and SenseVoice only write speech down; they can't translate. So they are used where the
   translator follows (Best). With **Fast**, Subtle keeps Whisper large-v3, which translates by itself.
-- **Settings → Speech model for each language** changes what "Auto" means for Chinese, Japanese,
+- **Languages → Speech model for each language** changes what "Auto" means for Chinese, Japanese,
   Korean and all other languages. A model picked in the popup still wins.
 - You can add your own models. Put a Whisper model folder into `models\whisper\`, or any instruct
   `.gguf` file into `models\llm\`, then press **Rescan**. Models you already downloaded with
@@ -265,13 +265,13 @@ Subtle only uses memory while you're actually watching something with subtitles:
   loaded, the engine hands that start-up memory back to Windows and keeps about 50 MB in use.
 - The speech model is loaded into exactly-sized blocks of video memory, without the gaps a normal
   load leaves behind (0.3-0.5 GB less).
-- **Five minutes after the last subtitle everything is unloaded** (Settings → Memory: 1-30 minutes,
+- **Five minutes after the last subtitle everything is unloaded** (Settings → Memory and speed: 1-30 minutes,
   or keep models loaded for instant starts). **Free memory now** on the Home page or in the tray
   menu does it at once.
 - Only one speech model is in memory at a time, and the translator only runs for the Best engine.
 - The translator is set up for subtitles: a small context and a compact 8-bit cache. That's about
   25% less video memory than a general chat setup.
-- **Previews** (the line updating while someone speaks) are the main GPU work. Settings → Memory can
+- **Previews** (the line updating while someone speaks) are the main GPU work. Settings → Memory and speed can
   make them less frequent, or turn them off.
 - The Home page shows exactly how much video memory and RAM each part of Subtle is using.
 
@@ -318,7 +318,7 @@ delete the Subtle folder and the two shortcuts, and remove the extension from th
 | Spoken → Subtitles in | Source language (or auto-detect) and subtitle language |
 | **Fast** / **Best** | See above |
 | Speech model | Auto picks large-v3 for Fast and turbo for Best (with Best: Parakeet for Japanese and SenseVoice for Chinese, if installed; changeable in the Subtle window's Settings) |
-| Translator | Any installed translator; the default is set on the Translator page of the Subtle window |
+| Translator | Any installed translator; the default is set on the Languages page of the Subtle window |
 | Show original-language line | With Best, shows the transcribed original under the translation |
 | Identify speakers | Gives each voice its own colour (26 MB voiceprint model, Models page) |
 | Auto-start when a video plays | Subtitles start by themselves on any tab where a video plays with sound (not for DRM video) |

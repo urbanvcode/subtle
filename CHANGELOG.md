@@ -5,6 +5,27 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-12
+
+### Changed
+- **The Subtle window is redesigned.** Six pages in three groups, each with its own icon:
+  - **Home**: status, four tiles (typical delay, speech engine, translator, video memory), a **chart of the
+    recent lines' delays** with the median, and the memory overview.
+  - **Any app** (new page): subtitles for Discord, games or VLC, with what to listen to, languages and a
+    live preview of how the subtitles look.
+  - **Models**: the model browser.
+  - **Languages** (new page): the speech model for each language, the translator and *Try the translator*
+    (replaces the old Translator page).
+  - **Settings**: memory and speed, the translator engine, starting, updates, files and logs.
+  - **Help**: the three setup steps, shortcuts, where to get help, and about.
+- Every card has an icon header and (i) tips where something needs explaining; the sidebar shows live
+  status and an *Update available* button.
+
+### Added
+- **Check for updates** on demand: *Settings → Updates → Check now* in the window, and on the popup's
+  **More** tab.
+
+
 ## [0.10.0] - 2026-11-12
 
 ### Changed
@@ -114,7 +135,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/ddsaamir/subtle/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ddsaamir/subtle/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ddsaamir/subtle/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ddsaamir/subtle/compare/v0.7.0...v0.8.0

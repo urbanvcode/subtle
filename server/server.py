@@ -705,7 +705,7 @@ class Session:
             if not self.llm_warned:
                 self.llm_warned = True
                 await self.status(f"Translator not answering ({type(e).__name__}) - showing the original text. "
-                                  "Check the Translator page of the Subtle window.", "error")
+                                  "Check the Languages page of the Subtle window.", "error")
             report(f"[llm] {type(e).__name__}: {e}")
             job.ctx_version = -1       # not a real translation: never reuse it for the finished line
             return src

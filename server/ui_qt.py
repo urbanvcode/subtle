@@ -19,7 +19,7 @@ from pathlib import Path
 
 from PySide6.QtCore import (QEasingCurve, QObject, QPropertyAnimation, QRectF, QSize, Qt, QTimer, QUrl, Signal,
                             Property)
-from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget)
@@ -47,15 +47,35 @@ PALETTES = {
                   warn="#a86400", warn_soft="#fff1d9", bad="#c43838", bad_soft="#fde8e8", other="#c3c9d3",
                   field="#ffffff", on_accent="#ffffff", knob="#ffffff", off="#b7bdc7"),
 }
-ICONS = {"home": "", "models": "", "translator": "", "settings": "", "setup": ""}
-PAGES = (("home", "Home"), ("models", "Models"), ("translator", "Translator"), ("settings", "Settings"),
-         ("setup", "Setup guide"))
+# Segoe Fluent Icons (Windows 11; Segoe MDL2 Assets on Windows 10 has the same code points for these)
+GLYPHS = {
+    "home": "\uE80F", "anyapp": "\uE7F4", "models": "\uE8F1", "languages": "\uE8C1", "settings": "\uE713",
+    "help": "\uE897", "pulse": "\uE9D9", "delay": "\uE916", "memory": "\uE964", "chip": "\uE950",
+    "speech": "\uE720", "translator": "\uE8C1", "speakers": "\uE716", "update": "\uE895", "warn": "\uE7BA",
+    "play": "\uE768", "stop": "\uE71A", "folder": "\uE8B7", "refresh": "\uE72C", "open": "\uE8A7",
+    "speed": "\uEC4A", "bolt": "\uE945", "star": "\uE734", "sound": "\uE767", "look": "\uE790",
+    "list": "\uE71D", "log": "\uE8A5", "bug": "\uEBE8", "sliders": "\uE9E9", "shield": "\uE83D",
+    "check": "\uE73E", "download": "\uE896", "game": "\uE7FC", "cog": "\uE9F5", "grid": "\uE8A9",
+}
+EMOJI = {  # Linux / macOS (no Segoe icon font)
+    "home": "⌂", "anyapp": "🖥", "models": "📚", "languages": "文", "settings": "⚙", "help": "?", "pulse": "📈",
+    "delay": "⏱", "memory": "▦", "chip": "▣", "speech": "🎙", "translator": "文", "speakers": "👥", "update": "⟳",
+    "warn": "⚠", "play": "▶", "stop": "■", "folder": "📁", "refresh": "⟳", "open": "↗", "speed": "⚡", "bolt": "⚡",
+    "star": "★", "sound": "🔊", "look": "🎨", "list": "☰", "log": "📄", "bug": "🐞", "sliders": "🎚", "shield": "🛡",
+    "check": "✓", "download": "⬇", "game": "🎮", "cog": "⚙", "grid": "▦",
+}
+# The sidebar: three groups, two pages each
+NAV = (("Subtitles", (("home", "Home"), ("anyapp", "Any app"))),
+       ("Library", (("models", "Models"), ("languages", "Languages"))),
+       ("App", (("settings", "Settings"), ("help", "Help"))))
+PAGES = tuple(item for _, items in NAV for item in items)
 SUBTITLES = {
-    "home": "What Subtle is doing right now, how fast subtitles arrive, and how much memory it uses.",
+    "home": "What Subtle is doing, how fast subtitles arrive, and how much memory it uses.",
+    "anyapp": "Subtitles for Discord, Zoom, games, VLC or a film on your PC, on top of every window.",
     "models": "Speech and translator models on this PC. Download what you need; delete what you don't.",
-    "translator": "Used by the Best engine and for subtitles in any language other than English.",
-    "settings": "How Subtle uses memory, which models it picks, and how it starts.",
-    "setup": "Three steps to your first subtitles.",
+    "languages": "Which speech model each language uses, and the translator behind the Best engine.",
+    "settings": "Memory and speed, the translator engine, starting, updates and files.",
+    "help": "Get started in three steps, shortcuts, and where to find help.",
 }
 LANGS = [("en", "English"), ("es", "Spanish"), ("fr", "French"), ("de", "German"), ("pt", "Portuguese"),
          ("ar", "Arabic"), ("hi", "Hindi"), ("ur", "Urdu"), ("id", "Indonesian"), ("ja", "Japanese")]
@@ -268,6 +288,53 @@ class MemBar(QWidget):
         p.drawRoundedRect(QRectF(0, 1, max(6.0, min(1.0, share) * self.width()), 6), 3, 3)
 
 
+class DelayChart(QWidget):
+    """The recent lines' delays as bars (green, amber over 0.4 s, red over 1 s) with the median as a line."""
+
+    def __init__(self, c):
+        super().__init__()
+        self.c, self.values, self.median = c, [], None
+        self.setMinimumHeight(86)
+
+    def set_values(self, values, median):
+        values = list(values or [])
+        if values != self.values or median != self.median:
+            self.values, self.median = values, median
+            self.update()
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        p.setPen(QColor(self.c["line"]))
+        for frac in (0.0, 0.5, 1.0):
+            y = int(4 + (h - 8) * frac)
+            p.drawLine(0, y, w, y)
+        if not self.values:
+            p.setPen(QColor(self.c["faint"]))
+            p.drawText(self.rect(), Qt.AlignCenter, "The delay of each line shows up here while subtitles run")
+            return
+        top = max(500.0, max(self.values) * 1.1)
+        n = 48
+        slot = w / n
+        bw = max(3.0, slot * 0.62)
+        p.setPen(Qt.NoPen)
+        for i, v in enumerate(self.values[-n:]):
+            x = w - (len(self.values[-n:]) - i) * slot + (slot - bw) / 2
+            bh = max(3.0, (h - 8) * min(1.0, (v / top) ** 0.5))     # square root: short delays stay visible
+            tone = "accent" if v <= 400 else "warn" if v <= 1000 else "bad"
+            p.setBrush(QColor(self.c[tone]))
+            p.drawRoundedRect(QRectF(x, h - 4 - bh, bw, bh), 2, 2)
+        if self.median is not None:
+            y = h - 4 - (h - 8) * min(1.0, (self.median / top) ** 0.5)
+            pen = p.pen()
+            pen = QPen(QColor(self.c["text"]))
+            pen.setStyle(Qt.DashLine)
+            p.setPen(pen)
+            p.drawLine(0, int(y), w, int(y))
+            p.drawText(4, int(y) - 4, f"median {self.median} ms")
+
+
 class Clickable(QFrame):
     clicked = Signal()
 
@@ -471,15 +538,21 @@ class ControlPanel:
         QPushButton[kind="primary"]:disabled {{ background: {c['panel2']}; color: {c['faint']}; }}
         QPushButton[kind="danger"] {{ background: {c['bad']}; color: #ffffff; border: none; font-weight: 600; }}
         QPushButton[size="small"] {{ padding: 4px 11px; font-size: 9pt; }}
+        #navgroup {{ color: {c['faint']}; font-size: 8pt; font-weight: 700; letter-spacing: 1px; padding: 14px 12px 4px; }}
+        #sidecard {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 12px; }}
+        #hero {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 14px; }}
+        #stat {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 12px; }}
+        #preview {{ border-radius: 10px; background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3b4a5c,
+                     stop:0.6 #1b2129, stop:1 #101419); }}
         #nav {{ background: transparent; border-radius: 8px; }}
         #nav:hover {{ background: {c['panel2']}; }}
         #nav[active="true"] {{ background: {c['accent_soft']}; }}
         #nav QLabel {{ font-size: 11pt; }}
         #nav[active="true"] QLabel {{ color: {c['accent']}; }}
-        #tab {{ background: transparent; border: none; border-bottom: 2px solid transparent; border-radius: 0;
-                padding: 6px 2px; margin-right: 16px; color: {c['muted']}; font-weight: 600; }}
-        #tab:hover {{ color: {c['text']}; background: transparent; }}
-        #tab[active="true"] {{ color: {c['accent']}; border-bottom: 2px solid {c['accent']}; }}
+        #tab {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 17px; padding: 7px 16px;
+                margin-right: 8px; color: {c['muted']}; font-weight: 600; }}
+        #tab:hover {{ color: {c['text']}; border-color: {c['faint']}; }}
+        #tab[active="true"] {{ color: {c['accent']}; background: {c['accent_soft']}; border-color: {c['accent']}; }}
         #choice {{ background: {c['panel']}; border: none; border-radius: 10px; }}
         #choice:hover {{ background: {c['panel2']}; }}
         QComboBox {{ background: {c['field']}; border: 1px solid {c['line']}; border-radius: 8px; padding: 6px 10px;
@@ -558,6 +631,49 @@ class ControlPanel:
             b.setProperty("size", "small")
         b.clicked.connect(lambda: fn())
         return b
+
+    def glyph(self, key, px=16, color=None):
+        lbl = QLabel(GLYPHS.get(key, "") if self.icon_family else EMOJI.get(key, "•"))
+        style = f"font-size: {px}px; background: transparent;"
+        if self.icon_family:                 # (the app style sheet sets Segoe UI everywhere: name the icon font here)
+            style += f" font-family: '{self.icon_family}';"
+        if color:
+            style += f" color: {color};"
+        lbl.setStyleSheet(style)
+        lbl.setAlignment(Qt.AlignCenter)
+        return lbl
+
+    def icon_chip(self, key, tone="accent", size=34):
+        """A rounded square with an icon: the start of every card header."""
+        soft = {"accent": "accent_soft", "warn": "warn_soft", "bad": "bad_soft", "muted": "panel2"}[tone]
+        color = self.c["muted"] if tone == "muted" else self.c[tone]
+        lbl = self.glyph(key, int(size * 0.47), color)
+        lbl.setStyleSheet(lbl.styleSheet().replace("background: transparent;", "")
+                          + f" background: {self.c[soft]}; border-radius: {size // 3}px;")
+        lbl.setFixedSize(size, size)
+        return lbl
+
+    def head(self, lay, icon, title, tip="", tone="accent", sub="", right=()):
+        """Card header: icon chip, title, (i), a line of explanation, and actions on the right."""
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        row.addWidget(self.icon_chip(icon, tone), 0, Qt.AlignTop)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        t = QHBoxLayout()
+        t.setSpacing(6)
+        t.addWidget(self.label(title, "h2"))
+        if tip:
+            t.addWidget(self.info(tip), 0, Qt.AlignVCenter)
+        t.addStretch(1)
+        col.addLayout(t)
+        if sub:
+            col.addWidget(self.label(sub, "small", wrap=True))
+        row.addLayout(col, 1)
+        for w in right:
+            row.addWidget(w, 0, Qt.AlignVCenter)
+        lay.addLayout(row)
+        return row
 
     def info(self, html):
         """A small (i) that explains something when you point at it."""
@@ -681,15 +797,15 @@ class ControlPanel:
         h.setSpacing(0)
         self.win.setCentralWidget(root)
 
-        # sidebar
+        # sidebar: brand, three groups of pages, live status, update pill
         side = QFrame()
         side.setObjectName("side")
-        side.setFixedWidth(232)
+        side.setFixedWidth(240)
         sv = QVBoxLayout(side)
         sv.setContentsMargins(14, 20, 14, 16)
         sv.setSpacing(2)
         brand = QHBoxLayout()
-        brand.setContentsMargins(6, 0, 0, 18)
+        brand.setContentsMargins(6, 0, 0, 8)
         logo = QLabel()
         if (ASSETS / "subtle.png").is_file():
             logo.setPixmap(QIcon(str(ASSETS / "subtle.png")).pixmap(38, 38))
@@ -705,65 +821,71 @@ class ControlPanel:
         sv.addLayout(brand)
 
         self.nav = {}
-        for key, title in PAGES:
-            item = Clickable()
-            item.setObjectName("nav")
-            item.setCursor(Qt.PointingHandCursor)
-            hl = QHBoxLayout(item)
-            hl.setContentsMargins(12, 9, 12, 9)
-            hl.setSpacing(12)
-            icon = QLabel(ICONS[key] if self.icon_family else "")
-            if self.icon_family:      # the app-wide stylesheet font would override setFont(), so set it here
-                icon.setStyleSheet(f"font-family: '{self.icon_family}'; font-size: 12pt;")
-            icon.setFixedWidth(20)
-            hl.addWidget(icon)
-            hl.addWidget(QLabel(title), 1)
-            item.clicked.connect(lambda k=key: self.go(k))
-            sv.addWidget(item)
-            self.nav[key] = item
+        for group, items in NAV:
+            g = QLabel(group.upper())
+            g.setObjectName("navgroup")
+            sv.addWidget(g)
+            for key, title in items:
+                item = Clickable()
+                item.setObjectName("nav")
+                item.setCursor(Qt.PointingHandCursor)
+                hl = QHBoxLayout(item)
+                hl.setContentsMargins(12, 8, 12, 8)
+                hl.setSpacing(12)
+                icon = self.glyph(key, 16)
+                icon.setFixedWidth(20)
+                hl.addWidget(icon)
+                hl.addWidget(QLabel(title), 1)
+                item.clicked.connect(lambda k=key: self.go(k))
+                sv.addWidget(item)
+                self.nav[key] = item
         sv.addStretch(1)
-        sv.addWidget(self.sep())
-        sv.addSpacing(10)
+
+        self.side_upd = self.button("Update available", lambda: self.go("home"), "primary", small=True)
+        self.side_upd.hide()
+        sv.addWidget(self.side_upd)
+        sv.addSpacing(8)
+        sc = QFrame()
+        sc.setObjectName("sidecard")
+        scl = QVBoxLayout(sc)
+        scl.setContentsMargins(12, 10, 12, 10)
+        scl.setSpacing(5)
         self.side_status = {}
-        for key, title in (("app", "Subtle"), ("engine", "Speech engine"), ("llm", "Translator"), ("delay", "Delay")):
+        for key, title in (("app", "Subtle"), ("engine", "Speech"), ("llm", "Translator"), ("delay", "Delay")):
             r = QHBoxLayout()
-            r.setContentsMargins(8, 2, 0, 2)
             r.setSpacing(8)
             d = Dot(c, 8)
             r.addWidget(d)
             t = self.label(f"{title}: …", "small")
             r.addWidget(t, 1)
-            sv.addLayout(r)
+            scl.addLayout(r)
             self.side_status[key] = (d, t, title)
+        sv.addWidget(sc)
         h.addWidget(side)
 
-        # content: header + pages + status line
+        # content: header (icon, title, line, actions) + pages + status line
         content = QWidget()
         content.setObjectName("content")
         cv = QVBoxLayout(content)
         cv.setContentsMargins(0, 0, 0, 0)
         cv.setSpacing(0)
         head = QWidget()
-        hv = QVBoxLayout(head)
-        hv.setContentsMargins(40, 24, 40, 14)
-        hv.setSpacing(4)
-        hrow = QHBoxLayout()
+        hv = QHBoxLayout(head)
+        hv.setContentsMargins(40, 24, 40, 16)
+        hv.setSpacing(16)
+        self.h_icon = self.icon_chip("home", size=46)
+        hv.addWidget(self.h_icon, 0, Qt.AlignTop)
+        tcol = QVBoxLayout()
+        tcol.setSpacing(2)
         self.h_title = self.label("", "title")
-        hrow.addWidget(self.h_title)
-        hrow.addStretch(1)
+        tcol.addWidget(self.h_title)
+        self.h_sub = self.label("", "muted", wrap=True)
+        tcol.addWidget(self.h_sub)
+        hv.addLayout(tcol, 1)
         self.h_actions = QStackedWidget()
         self.h_actions.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
-        hrow.addWidget(self.h_actions)
-        hv.addLayout(hrow)
-        self.h_sub = self.label("", "muted", wrap=True)
-        hv.addWidget(self.h_sub)
+        hv.addWidget(self.h_actions, 0, Qt.AlignVCenter)
         cv.addWidget(head)
-        line = self.sep()
-        lw = QWidget()
-        ll = QHBoxLayout(lw)
-        ll.setContentsMargins(40, 0, 40, 0)
-        ll.addWidget(line)
-        cv.addWidget(lw)
 
         self.stack = QStackedWidget()
         cv.addWidget(self.stack, 1)
@@ -776,8 +898,8 @@ class ControlPanel:
         h.addWidget(content, 1)
 
         self.pages, self.page_actions = {}, {}
-        builders = {"home": self._home, "models": self._models, "translator": self._translator,
-                    "settings": self._settings, "setup": self._setup}
+        builders = {"home": self._home, "anyapp": self._anyapp, "models": self._models, "languages": self._languages,
+                    "settings": self._settings, "help": self._help}
         for key, _ in PAGES:
             sa = QScrollArea()
             sa.setWidgetResizable(True)
@@ -786,12 +908,12 @@ class ControlPanel:
             inner = QWidget()
             inner.setObjectName("page")
             outer = QHBoxLayout(inner)
-            outer.setContentsMargins(40, 12, 40, 24)
+            outer.setContentsMargins(40, 4, 40, 24)
             col = QWidget()
             col.setMaximumWidth(self.COLUMN)
             lay = QVBoxLayout(col)
             lay.setContentsMargins(0, 0, 0, 0)
-            lay.setSpacing(12)
+            lay.setSpacing(14)
             outer.addWidget(col, 1)
             outer.addStretch(0)
             sa.setWidget(inner)
@@ -807,6 +929,7 @@ class ControlPanel:
             lay.addStretch(1)
 
     def go(self, key):
+        key = {"setup": "help", "translator": "languages"}.get(key, key)
         for k, item in self.nav.items():
             self.restyle(item, active="true" if k == key else "false")
         if key != self.page:
@@ -817,19 +940,21 @@ class ControlPanel:
             self.h_actions.setCurrentWidget(self.page_actions[key][0])
             self.h_title.setText(dict(PAGES)[key])
             self.h_sub.setText(SUBTITLES[key])
+            self.h_icon.setText(GLYPHS.get(key, "") if self.icon_family else EMOJI.get(key, ""))
         self.page = key
-        if self.visible and key in ("models", "setup"):
+        if self.visible and key in ("models", "help", "languages"):
             self.refresh(True)
 
     # ================================================================ HOME
     def _home(self, lay):
         c = self.c
-        # "A new version is available" (from the daily GitHub check; Settings can turn it off)
+        # a new version (from the daily GitHub check, or Settings -> Check now)
         self.upd = QFrame()
         self.upd.setObjectName("soft")
         ul = QHBoxLayout(self.upd)
-        ul.setContentsMargins(20, 12, 20, 12)
-        ul.setSpacing(16)
+        ul.setContentsMargins(18, 14, 18, 14)
+        ul.setSpacing(14)
+        ul.addWidget(self.icon_chip("update"), 0, Qt.AlignVCenter)
         self.upd_text = self.label("", "bold", wrap=True)
         ul.addWidget(self.upd_text, 1)
         self.upd_url = ""
@@ -840,116 +965,50 @@ class ControlPanel:
         self.upd.hide()
         lay.addWidget(self.upd)
 
-        hero, hl = self.card((24, 20, 24, 20))
+        # status
+        hero = QFrame()
+        hero.setObjectName("hero")
+        hl = QHBoxLayout(hero)
+        hl.setContentsMargins(22, 20, 22, 20)
+        hl.setSpacing(18)
+        self.hero_icon = self.icon_chip("pulse", size=54)
+        hl.addWidget(self.hero_icon, 0, Qt.AlignVCenter)
+        tcol = QVBoxLayout()
+        tcol.setSpacing(3)
         top = QHBoxLayout()
-        top.setSpacing(12)
-        self.hero_dot = Dot(c, 14)
+        top.setSpacing(10)
+        self.hero_dot = Dot(c, 12)
         top.addWidget(self.hero_dot, 0, Qt.AlignVCenter)
         self.hero_title = self.label("Starting…", "big")
         top.addWidget(self.hero_title, 1)
-        hl.addLayout(top)
+        tcol.addLayout(top)
         self.hero_sub = self.label("", "muted", wrap=True)
-        hl.addWidget(self.hero_sub)
+        tcol.addWidget(self.hero_sub)
+        hl.addLayout(tcol, 1)
+        acts = QVBoxLayout()
+        acts.setSpacing(8)
+        acts.addWidget(self.button("Subtitles for any app", lambda: self.go("anyapp")))
+        acts.addWidget(self.button("Free memory now", lambda: self.cmd(
+            "unload", lambda r: self.toast("Models unloaded - their memory is free again"))))
+        hl.addLayout(acts)
         lay.addWidget(hero)
 
-        # subtitles for the PC's own sound (any app)
-        pc, pl = self.card((24, 18, 24, 18))
-        ph = QHBoxLayout()
-        ph.addWidget(self.label("Subtitles for any app", "h2"))
-        ph.addSpacing(6)
-        ph.addWidget(self.info("Subtle listens to what your PC plays and puts subtitles on top of every window; "
-                               "clicks go straight through them.<br><br><b>Listen to</b>: everything, or only one "
-                               "program (e.g. Discord) so music or other videos are left out (Windows 10 2004 or newer)."
-                               "<br><br>Games in exclusive fullscreen cover the subtitles: use borderless or windowed mode."
-                               "<br>Nothing is recorded: the sound only goes to the speech engine on this PC."),
-                     0, Qt.AlignVCenter)
-        ph.addStretch(1)
-        self.pc_btn = self.button("Start", self.pc_toggle, "primary")
-        ph.addWidget(self.pc_btn)
-        pl.addLayout(ph)
-        pl.addWidget(self.label("Discord, Zoom, games, VLC, a film on your PC: Subtle listens to what your speakers "
-                                "play and shows subtitles at the bottom of your screen.", "small", wrap=True))
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(4)
-        self.pc_lang = self.combo(PC_SPOKEN, lambda v: self.pc_save(pc_language=v))
-        self.pc_target = self.combo(PC_TARGETS, lambda v: self.pc_save(pc_target=v))
-        self.pc_mode = self.combo([("whisper", "Fast (to English)"), ("llm", "Best (any language)")],
-                                  lambda v: self.pc_save(pc_mode=v))
-        self.pc_dev = self.combo([("", "Everything (default speakers)")],
-                                 lambda v: self.pc_load_sources() if v == "__refresh__" else self.pc_save(pc_device=v))
-        for col, (title, w) in enumerate((("Spoken", self.pc_lang), ("Subtitles in", self.pc_target),
-                                          ("Engine", self.pc_mode), ("Listen to", self.pc_dev))):
-            grid.addWidget(self.label(title, "small"), 0, col)
-            grid.addWidget(w, 1, col)
-            grid.setColumnStretch(col, 1)
-        self.pc_size = self.combo([(v, f"{v}%") for v in (70, 85, 100, 125, 150, 200)],
-                                  lambda v: self.pc_save(False, pc_size=v))
-        self.pc_height = self.combo([(v, f"{v}% up") for v in (2, 5, 8, 12, 20, 30, 45)],
-                                    lambda v: self.pc_save(False, pc_height=v))
-        self.pc_opacity = self.combo([(v, f"{v}%") for v in (0, 30, 45, 62, 80, 100)],
-                                     lambda v: self.pc_save(False, pc_opacity=v))
-        self.pc_screen = self.combo([(0, "Main screen")], lambda v: self.pc_save(False, pc_screen=v))
-        for col, (title, w) in enumerate((("Text size", self.pc_size), ("Position", self.pc_height),
-                                          ("Box", self.pc_opacity), ("Screen", self.pc_screen))):
-            grid.addWidget(self.label(title, "small"), 2, col)
-            grid.addWidget(w, 3, col)
-        pl.addLayout(grid)
-        self.pc_state = self.label("", "small", wrap=True)
-        pl.addWidget(self.pc_state)
-        lay.addWidget(pc)
-        self.overlay = None
-        self._pc_devices_loaded = False
-
-        # subtitle delay
-        dc, dl = self.card((24, 18, 24, 18))
-        dh = QHBoxLayout()
-        dh.addWidget(self.label("Subtitle delay", "h2"))
-        dh.addSpacing(6)
-        dh.addWidget(self.info("Measured for every finished line: from the moment the speaker stopped to the moment "
-                               "the words appeared on the video. If an in-progress line already showed the same words, "
-                               "that earlier moment counts.<br><br><b>Median</b> is the typical line; the <b>average</b> "
-                               "goes up when a long sentence had to be cut or a model was still loading.<br>"
-                               "<b>Speech + translation</b> is only the computing time."), 0, Qt.AlignVCenter)
-        dh.addStretch(1)
-        self.delay_count = self.label("", "small")
-        dh.addWidget(self.delay_count)
-        dh.addSpacing(10)
-        dh.addWidget(self.button("Reset", lambda: self.cmd("reset_delay", lambda r: self.refresh()), small=True))
-        dl.addLayout(dh)
-        dl.addWidget(self.label("From the moment the speaker stops to the moment the words appear. Lower is better.",
-                                "small", wrap=True))
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(2)
-        self.delay_vals = {}
-        for i, (key, title) in enumerate((("last", "Last line"), ("avg", "Average"), ("median", "Median"),
-                                          ("compute", "Speech + translation"))):
-            box = QFrame()
-            box.setObjectName("soft" if i < 3 else "card")
-            bl = QVBoxLayout(box)
-            bl.setContentsMargins(16, 12, 16, 12)
-            bl.setSpacing(0)
-            bl.addWidget(self.label(title, "small"))
-            v = self.label("–", "huge")
-            bl.addWidget(v)
-            u = self.label("", "faint")
-            bl.addWidget(u)
-            grid.addWidget(box, 0, i)
-            grid.setColumnStretch(i, 1)
-            self.delay_vals[key] = (v, u)
-        dl.addSpacing(6)
-        dl.addLayout(grid)
-        lay.addWidget(dc)
-
-        # three tiles
+        # four tiles: delay, speech engine, translator, video memory
         tiles = QHBoxLayout()
         tiles.setSpacing(12)
         self.tiles = {}
-        for key, title in (("engine", "Speech engine"), ("llm", "Translator"), ("vram", "Subtle's video memory")):
-            t, tl = self.card((18, 14, 18, 14))
-            tl.setSpacing(2)
-            tl.addWidget(self.label(title, "small"))
+        for key, icon, title in (("median", "delay", "Typical delay"), ("engine", "speech", "Speech engine"),
+                                 ("llm", "translator", "Translator"), ("vram", "memory", "Video memory")):
+            t = QFrame()
+            t.setObjectName("stat")
+            tl = QVBoxLayout(t)
+            tl.setContentsMargins(16, 14, 16, 14)
+            tl.setSpacing(4)
+            hrow = QHBoxLayout()
+            hrow.setSpacing(8)
+            hrow.addWidget(self.glyph(icon, 14, c["muted"]))
+            hrow.addWidget(self.label(title, "small"), 1)
+            tl.addLayout(hrow)
             v = self.label("-", "big")
             tl.addWidget(v)
             d = self.label("", "small", wrap=True)
@@ -958,20 +1017,49 @@ class ControlPanel:
             self.tiles[key] = (v, d)
         lay.addLayout(tiles)
 
+        # subtitle delay: chart of the recent lines + the numbers
+        dc, dl = self.card((22, 18, 22, 18))
+        self.delay_count = self.label("", "small")
+        self.head(dl, "delay", "Subtitle delay",
+                  tip="Measured for every finished line: from the moment the speaker stopped to the moment the words "
+                      "appeared on the video. If an in-progress line already showed the same words, that earlier "
+                      "moment counts.<br><br><b>Median</b> is the typical line; the <b>average</b> goes up when a long "
+                      "sentence had to be cut or a model was still loading.<br><b>Speech + translation</b> is only "
+                      "the computing time.",
+                  sub="From the moment the speaker stops to the moment the words appear. Lower is better.",
+                  right=(self.delay_count, self.button("Reset", lambda: self.cmd("reset_delay", lambda r: self.refresh()),
+                                                       small=True)))
+        self.delay_chart = DelayChart(c)
+        dl.addSpacing(4)
+        dl.addWidget(self.delay_chart)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        self.delay_vals = {}
+        for i, (key, title) in enumerate((("last", "Last line"), ("avg", "Average"), ("median", "Median"),
+                                          ("compute", "Speech + translation"))):
+            box = QFrame()
+            box.setObjectName("soft" if i < 3 else "card")
+            bl = QVBoxLayout(box)
+            bl.setContentsMargins(14, 10, 14, 10)
+            bl.setSpacing(0)
+            bl.addWidget(self.label(title, "small"))
+            v = self.label("–", "big")
+            bl.addWidget(v)
+            u = self.label("", "faint")
+            bl.addWidget(u)
+            grid.addWidget(box, 0, i)
+            grid.setColumnStretch(i, 1)
+            self.delay_vals[key] = (v, u)
+        dl.addLayout(grid)
+        lay.addWidget(dc)
+
         # memory
-        mc, ml = self.card((24, 18, 24, 18))
-        mh = QHBoxLayout()
-        mh.addWidget(self.label("Memory", "h2"))
-        mh.addSpacing(6)
-        mh.addWidget(self.info("Subtle loads models only while subtitles run and frees them a few minutes after the last "
-                               "line (Settings &rarr; Memory). <b>Free memory now</b> does it at once.<br><br>"
-                               "The bar shows your whole graphics card: Subtle, other programs (games, browsers) and "
-                               "what is free."), 0, Qt.AlignVCenter)
-        mh.addStretch(1)
-        mh.addWidget(self.button("Free memory now", lambda: self.cmd(
-            "unload", lambda r: self.toast("Models unloaded - their memory is free again"))))
-        ml.addLayout(mh)
+        mc, ml = self.card((22, 18, 22, 18))
         self.gpu_line = self.label("", "small")
+        self.head(ml, "chip", "Memory",
+                  tip="Subtle loads models only while subtitles run and frees them a few minutes after the last line "
+                      "(Settings &rarr; Memory and speed). <b>Free memory now</b> does it at once.<br><br>The bar shows "
+                      "your whole graphics card: Subtle, other programs (games, browsers) and what is free.")
         ml.addWidget(self.gpu_line)
         self.vbar = Bar(c, 12)
         ml.addWidget(self.vbar)
@@ -1011,13 +1099,100 @@ class ControlPanel:
 
         self.notice, nl = self.card((20, 14, 20, 14), name="softwarn")
         nr = QHBoxLayout()
+        nr.setSpacing(12)
+        nr.addWidget(self.icon_chip("warn", "warn"))
         self.notice_text = self.label("", wrap=True)
         self.notice_text.setStyleSheet(f"color: {c['warn']};")
         nr.addWidget(self.notice_text, 1)
-        nr.addWidget(self.button("Open Setup guide", lambda: self.go("setup"), "primary"))
+        nr.addWidget(self.button("Get models", lambda: self.go("models"), "primary"))
         nl.addLayout(nr)
         self.notice.hide()
         lay.addWidget(self.notice)
+
+    # ================================================================ ANY APP
+    def _anyapp(self, lay):
+        c = self.c
+        self.pc_btn = self.button("Start", self.pc_toggle, "primary")
+        self.pc_btn.setMinimumWidth(120)
+        main, ml = self.card((22, 18, 22, 18))
+        self.head(ml, "anyapp", "Subtitles on your screen",
+                  tip="Subtle listens to what your PC plays and puts subtitles on top of every window; clicks go straight "
+                      "through them.<br><br>Games in exclusive fullscreen cover the subtitles: use borderless or "
+                      "windowed mode.<br>Nothing is recorded: the sound only goes to the speech engine on this PC.",
+                  sub="For Discord, Zoom, games, VLC or a film on your PC. Browser tabs work best with the extension.",
+                  right=(self.pc_btn,))
+        self.pc_state = self.label("", "small", wrap=True)
+        ml.addWidget(self.pc_state)
+        lay.addWidget(main)
+        self.simple_hint, shl = self.card((20, 14, 20, 14), name="softwarn")
+        shl.addWidget(self.label("Simple mode is on (Settings), so subtitles for other apps are hidden.", wrap=True))
+        self.simple_hint.hide()
+        lay.addWidget(self.simple_hint)
+
+        src, sl = self.card((22, 18, 22, 18))
+        self.pc_dev = self.combo([("", "Everything (default speakers)")],
+                                 lambda v: self.pc_load_sources() if v == "__refresh__" else self.pc_save(pc_device=v))
+        self.head(sl, "sound", "What to listen to",
+                  tip="<b>Everything</b>: all sound your speakers play.<br><b>Only one program</b>: e.g. only Discord, "
+                      "so music or videos elsewhere are left out (Windows 10 version 2004 or newer). The list shows "
+                      "programs that are playing sound now; <i>Refresh this list</i> finds newer ones.")
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(self.pc_dev, 1)
+        row.addWidget(self.button("Refresh", self.pc_load_sources, small=True))
+        sl.addLayout(row)
+        lay.addWidget(src)
+
+        lc, ll = self.card((22, 18, 22, 18))
+        self.head(ll, "languages", "Languages",
+                  tip="<b>Fast</b>: Whisper translates straight to English (least memory).<br><b>Best</b>: a speech model "
+                      "writes the speech down and the translator turns it into any language.")
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(4)
+        self.pc_lang = self.combo(PC_SPOKEN, lambda v: self.pc_save(pc_language=v))
+        self.pc_target = self.combo(PC_TARGETS, lambda v: self.pc_save(pc_target=v))
+        self.pc_mode = self.combo([("whisper", "Fast (to English)"), ("llm", "Best (any language)")],
+                                  lambda v: self.pc_save(pc_mode=v))
+        for col, (title, w) in enumerate((("Spoken", self.pc_lang), ("Subtitles in", self.pc_target), ("Engine", self.pc_mode))):
+            grid.addWidget(self.label(title, "small"), 0, col)
+            grid.addWidget(w, 1, col)
+            grid.setColumnStretch(col, 1)
+        ll.addLayout(grid)
+        lay.addWidget(lc)
+
+        vc, vl = self.card((22, 18, 22, 18))
+        self.head(vl, "look", "How the subtitles look", sub="Changes show right away, also while subtitles run.")
+        self.pc_preview = QFrame()
+        self.pc_preview.setObjectName("preview")
+        self.pc_preview.setMinimumHeight(110)
+        pv = QVBoxLayout(self.pc_preview)
+        pv.setContentsMargins(12, 10, 12, 12)
+        pv.addStretch(1)
+        self.pc_sample = QLabel("Where were you last night?")
+        self.pc_sample.setAlignment(Qt.AlignCenter)
+        pv.addWidget(self.pc_sample, 0, Qt.AlignHCenter)
+        self.pc_preview_space = pv
+        vl.addWidget(self.pc_preview)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(4)
+        self.pc_size = self.combo([(v, f"{v}%") for v in (70, 85, 100, 125, 150, 200)],
+                                  lambda v: self.pc_save(False, pc_size=v))
+        self.pc_height = self.combo([(v, f"{v}% up") for v in (2, 5, 8, 12, 20, 30, 45)],
+                                    lambda v: self.pc_save(False, pc_height=v))
+        self.pc_opacity = self.combo([(v, f"{v}%") for v in (0, 30, 45, 62, 80, 100)],
+                                     lambda v: self.pc_save(False, pc_opacity=v))
+        self.pc_screen = self.combo([(0, "Main screen")], lambda v: self.pc_save(False, pc_screen=v))
+        for col, (title, w) in enumerate((("Text size", self.pc_size), ("Position", self.pc_height),
+                                          ("Box", self.pc_opacity), ("Screen", self.pc_screen))):
+            grid.addWidget(self.label(title, "small"), 0, col)
+            grid.addWidget(w, 1, col)
+            grid.setColumnStretch(col, 1)
+        vl.addLayout(grid)
+        lay.addWidget(vc)
+        self.overlay = None
+        self._pc_devices_loaded = False
 
     # ---------------------------------------------------------------- PC sound
     def pc_toggle(self):
@@ -1071,12 +1246,14 @@ class ControlPanel:
     def render_pc(self):
         st = self.st
         s, pc = st.get("settings", {}), st.get("pc") or {}
-        card = self.pc_btn.parentWidget()
         hide = bool(st.get("simple")) and not pc.get("running")
-        if card is not None and card.isHidden() != hide:
-            card.setVisible(not hide)
-        if hide:
-            return
+        self.nav["anyapp"].setVisible(not hide)
+        self.simple_hint.setVisible(hide)
+        alpha = max(0, min(100, int(s.get("pc_opacity", 62)))) / 100
+        px = int(18 * int(s.get("pc_size", 100)) / 100)
+        self.pc_sample.setStyleSheet(f"color: #ffffff; background: rgba(8, 8, 12, {alpha:.2f}); border-radius: {px // 4}px; "
+                                     f"padding: {px // 6}px {px // 2}px; font-size: {px}px; font-weight: 600;")
+        self.pc_preview_space.setContentsMargins(12, 10, 12, max(4, int(110 * int(s.get("pc_height", 8)) / 100)))
         self.set_combo(self.pc_lang, s.get("pc_language", "ja"))
         self.set_combo(self.pc_target, s.get("pc_target", "en"))
         self.set_combo(self.pc_mode, s.get("pc_mode", "whisper"))
@@ -1172,6 +1349,11 @@ class ControlPanel:
         self.set_text(v, f"{d['compute_avg']}" if n else "–")
         self.set_text(unit, f"ms on average (last {d['compute_last']} ms)" if n else "")
 
+        v, dd = self.tiles["median"]
+        self.set_text(v, f"{d['median']} ms" if n else "–")
+        self.restyle(v, tone="ok" if n and d["median"] <= 400 else "busy" if n else "")
+        self.set_text(dd, f"over {n} line{'s' if n != 1 else ''}" if n else "Start subtitles to measure")
+        self.delay_chart.set_values(d.get("recent") or [], d.get("median") if n else None)
         v, dd = self.tiles["engine"]
         self.set_text(v, {"ready": "Running", "starting": "Loading", "error": "Problem"}.get(es, "Idle"))
         self.restyle(v, tone={"ready": "ok", "starting": "busy", "error": "bad"}.get(es, ""))
@@ -1219,6 +1401,7 @@ class ControlPanel:
                    {"ready": "running", "starting": "loading", "error": "problem"}.get(es, "idle"))
         self._side("llm", "ok" if ext else {"ready": "ok", "starting": "busy", "error": "bad"}.get(ts, "off"),
                    "external" if ext else {"ready": "running", "starting": "loading", "error": "problem"}.get(ts, "off"))
+        self.side_upd.setVisible(bool((st.get("update") or {}).get("version")))
         d = st.get("delay") or {}
         self._side("delay", "ok" if d.get("count") else "off",
                    f"{d['last']} ms (median {d['median']})" if d.get("count") else "no lines yet")
@@ -1271,8 +1454,9 @@ class ControlPanel:
         self.rec = QFrame()
         self.rec.setObjectName("soft")
         rl = QHBoxLayout(self.rec)
-        rl.setContentsMargins(20, 14, 20, 14)
-        rl.setSpacing(16)
+        rl.setContentsMargins(18, 16, 20, 16)
+        rl.setSpacing(14)
+        rl.addWidget(self.icon_chip("star", size=40), 0, Qt.AlignTop)
         rt = QVBoxLayout()
         rt.setSpacing(2)
         self.rec_title = self.label("", "bold", wrap=True)
@@ -1589,16 +1773,29 @@ class ControlPanel:
         self.refresh(True)
 
     # ================================================================ TRANSLATOR
-    def _translator(self, lay):
-        self.section(lay, "Where translations come from", top=4)
-        src, sl = self.card((6, 6, 6, 6))
-        sl.setSpacing(2)
+    def _languages(self, lay):
+        sc, sl = self.card((22, 18, 22, 18))
+        self.head(sl, "speech", "Speech model for each language",
+                  tip="What <i>Automatic</i> means for each spoken language. A model picked in the extension popup "
+                      "still wins.",
+                  sub="Subtle picks the best installed model by itself; choose here to always use another one.")
+        self.asr_defaults = {}
+        for i, (key, title, desc) in enumerate(ASR_DEFAULT_ROWS):
+            cb = self.combo([("auto", "Automatic (recommended)")], lambda v, k=key: self.save(**{f"asr_default_{k}": v}), 300)
+            self.setting_row(sl, title, desc, cb, first=i == 0)
+            self.asr_defaults[key] = cb
+        lay.addWidget(sc)
+
+        tc0, tl0 = self.card((22, 18, 22, 18))
+        self.head(tl0, "translator", "Translator",
+                  tip="The translator turns the written-down speech into natural subtitles in any language (Best engine), "
+                      "and makes the Catch me up summaries and word explanations.",
+                  sub="Where translations come from, and which model makes them.")
         self.src_rows = {}
-        for i, (key, title, desc) in enumerate((
-                ("builtin", "Built-in (recommended)",
-                 "Subtle runs the translator itself, only while it's needed, and stops it when you're done."),
-                ("external", "Another program",
-                 "LM Studio, Ollama or any OpenAI-compatible server that you start yourself."))):
+        for key, title, desc in (("builtin", "Built-in (recommended)",
+                                  "Subtle runs the translator itself, only while it's needed, and stops it when you're done."),
+                                 ("external", "Another program",
+                                  "LM Studio, Ollama or any OpenAI-compatible server that you start yourself.")):
             row = Clickable()
             row.setObjectName("choice")
             row.setCursor(Qt.PointingHandCursor)
@@ -1614,27 +1811,25 @@ class ControlPanel:
             txt.addWidget(self.label(desc, "small", wrap=True))
             rl.addLayout(txt, 1)
             row.clicked.connect(lambda k=key: self.save(llm_backend=k))
-            sl.addWidget(row)
+            tl0.addWidget(row)
             self.src_rows[key] = mark
-        lay.addWidget(src)
-
-        self.ext_card, el = self.card()
+        self.ext_card = QWidget()
+        el = QVBoxLayout(self.ext_card)
+        el.setContentsMargins(0, 6, 0, 0)
+        el.setSpacing(6)
         self.ext_url, self.ext_model = QLineEdit(), QLineEdit()
         for edit, title, key in ((self.ext_url, "Server address", "external_url"),
                                  (self.ext_model, "Model name (as that server calls it; empty = choose in the popup)", "llm_model")):
             el.addWidget(self.label(title, "small"))
             el.addWidget(edit)
             edit.editingFinished.connect(lambda e=edit, k=key: self.save(**{k: e.text().strip()}))
-        lay.addWidget(self.ext_card)
-
+        tl0.addWidget(self.ext_card)
         self.builtin_wrap = QWidget()
-        bw = QVBoxLayout(self.builtin_wrap)
-        bw.setContentsMargins(0, 0, 0, 0)
-        bw.setSpacing(12)
-        self.section(bw, "Translator model", top=10)
-        bc, bl = self.card()
+        bl = QVBoxLayout(self.builtin_wrap)
+        bl.setContentsMargins(0, 6, 0, 0)
+        bl.setSpacing(0)
         self.llm_pick = self.combo([], lambda v: self.save(llm_model=v, llm_backend="builtin"), 320)
-        self.setting_row(bl, "Default model", "Used unless you pick another one in the extension popup.", self.llm_pick, first=True)
+        self.setting_row(bl, "Default model", "Used unless you pick another one in the extension popup.", self.llm_pick)
         status = QWidget()
         stl = QHBoxLayout(status)
         stl.setContentsMargins(0, 0, 0, 0)
@@ -1647,30 +1842,12 @@ class ControlPanel:
         stl.addWidget(self.button("Start now", self.llm_start, "primary", small=True))
         stl.addWidget(self.button("Stop", lambda: self.cmd("llm_stop", lambda x: self.refresh()), small=True))
         self.setting_row(bl, "Status", "", status)
-        bw.addWidget(bc)
+        tl0.addWidget(self.builtin_wrap)
+        lay.addWidget(tc0)
 
-        self.adv_btn = QPushButton("▸  Advanced")
-        self.adv_btn.setObjectName("tab")
-        self.adv_btn.setCursor(Qt.PointingHandCursor)
-        self.adv_btn.clicked.connect(self.toggle_adv)
-        bw.addWidget(self.adv_btn, 0, Qt.AlignLeft)
-        self.adv, al = self.card()
-        self.layers = self.combo(LAYER_CHOICES, lambda v: self.save(llm_gpu_layers=v), 260)
-        self.setting_row(al, "On the graphics card", "Less = less video memory, but slower translations.", self.layers, first=True,
-                         tip="How many of the translator model's layers run on the graphics card. All of them is fastest; "
-                             "fewer moves the rest to the processor, which saves video memory but slows each line down.")
-        self.ctx = self.combo(CTX_CHOICES, lambda v: self.save(llm_context=v), 260)
-        self.setting_row(al, "Context size", "How much text the translator can look at. Subtitles need little.", self.ctx,
-                         tip="A subtitle prompt (the new line plus the four lines before it) is about 400 tokens, so 2048 "
-                             "leaves room for Catch me up. Bigger only costs video memory.")
-        self.kv = Toggle(self.c, lambda v: self.save(llm_kv_quant=v))
-        self.setting_row(al, "Compact memory", "8-bit context memory: less video memory, same translations.", self.kv)
-        self.adv.hide()
-        bw.addWidget(self.adv)
-        lay.addWidget(self.builtin_wrap)
-
-        self.section(lay, "Try it")
-        tc, tl = self.card()
+        tc, tl = self.card((22, 18, 22, 18))
+        self.test_btn = self.button("Translate", self.llm_test, "primary")
+        self.head(tl, "bolt", "Try the translator", sub="Type something in any language and press Translate.")
         row = QHBoxLayout()
         row.setSpacing(10)
         self.test_text = QLineEdit("今日は本当にありがとうございました。")
@@ -1678,17 +1855,11 @@ class ControlPanel:
         row.addWidget(self.label("into", "muted"))
         self.test_target = self.combo(LANGS, lambda v: None, 130)
         row.addWidget(self.test_target)
-        self.test_btn = self.button("Translate", self.llm_test, "primary")
         row.addWidget(self.test_btn)
         tl.addLayout(row)
-        self.test_out = self.label("Type something in any language and press Translate.", "muted", wrap=True)
+        self.test_out = self.label("", "muted", wrap=True)
         tl.addWidget(self.test_out)
         lay.addWidget(tc)
-
-    def toggle_adv(self):
-        show = not self.adv.isVisible()
-        self.adv.setVisible(show)
-        self.adv_btn.setText(("▾" if show else "▸") + "  Advanced")
 
     def llm_start(self):
         self.llm_status.setText("Starting…")
@@ -1752,8 +1923,8 @@ class ControlPanel:
     # ================================================================ SETTINGS
     def _settings(self, lay):
         c = self.c
-        self.section(lay, "Memory", top=4)
-        mc, ml = self.card()
+        mc, ml = self.card((22, 18, 22, 18))
+        self.head(ml, "speed", "Memory and speed", sub="Subtle only uses memory while subtitles run.")
         self.idle = self.combo(IDLE_CHOICES, lambda v: self.save(idle_unload_min=v), 170)
         self.setting_row(ml, "Free memory after", "Unload everything when nothing was subtitled for this long.", self.idle, first=True)
         self.keep = Toggle(c, lambda v: self.save(keep_loaded=v))
@@ -1764,33 +1935,48 @@ class ControlPanel:
                              "'Off' shows only finished lines (about 0.2 s after the speaker stops).")
         lay.addWidget(mc)
 
-        self.section(lay, "Speech model for each language")
-        sc, sl = self.card()
-        self.asr_defaults = {}
-        for i, (key, title, desc) in enumerate(ASR_DEFAULT_ROWS):
-            cb = self.combo([("auto", "Automatic (recommended)")], lambda v, k=key: self.save(**{f"asr_default_{k}": v}), 300)
-            self.setting_row(sl, title, desc + " The popup's own choice still wins.", cb, first=i == 0)
-            self.asr_defaults[key] = cb
-        lay.addWidget(sc)
+        ec, el = self.card((22, 18, 22, 18))
+        self.head(el, "chip", "Translator engine", sub="For the built-in translator. The defaults suit subtitles.")
+        self.layers = self.combo(LAYER_CHOICES, lambda v: self.save(llm_gpu_layers=v), 260)
+        self.setting_row(el, "On the graphics card", "Less = less video memory, but slower translations.", self.layers, first=True,
+                         tip="How many of the translator model's layers run on the graphics card. All of them is fastest; "
+                             "fewer moves the rest to the processor, which saves video memory but slows each line down.")
+        self.ctx = self.combo(CTX_CHOICES, lambda v: self.save(llm_context=v), 260)
+        self.setting_row(el, "Context size", "How much text the translator can look at. Subtitles need little.", self.ctx,
+                         tip="A subtitle prompt (the new line plus the four lines before it) is about 400 tokens, so 2048 "
+                             "leaves room for Catch me up. Bigger only costs video memory.")
+        self.kv = Toggle(c, lambda v: self.save(llm_kv_quant=v))
+        self.setting_row(el, "Compact memory", "8-bit context memory: less video memory, same translations.", self.kv)
+        self.scan_lms = Toggle(c, lambda v: self.save(scan_lmstudio=v))
+        self.setting_row(el, "Use LM Studio's models", "Translator models you downloaded with LM Studio are used without copying.",
+                         self.scan_lms)
+        lay.addWidget(ec)
 
-        self.section(lay, "Starting Subtle")
-        ac, al = self.card()
+        ac, al = self.card((22, 18, 22, 18))
+        self.head(al, "play", "Starting Subtle")
         self.auto = Toggle(c, self.toggle_autostart)
-        self.setting_row(al, "Start with Windows", "Waits in the tray and uses no video memory until you need it.", self.auto, first=True)
+        self.setting_row(al, "Start with Windows" if sys.platform == "win32" else "Start when I log in",
+                         "Waits in the tray and uses no video memory until you need it.", self.auto, first=True)
         self.open_start = Toggle(c, lambda v: self.save(open_panel_on_start=v))
         self.setting_row(al, "Show this window when Subtle starts", "Otherwise it starts quietly in the tray.", self.open_start)
-        self.scan_lms = Toggle(c, lambda v: self.save(scan_lmstudio=v))
-        self.setting_row(al, "Use LM Studio's models", "Translator models you downloaded with LM Studio are used without copying.", self.scan_lms)
         self.simple_t = Toggle(c, lambda v: self.save(simple_mode=v))
         self.simple_row = self.setting_row(al, "Simple mode", "Only what the browser extension needs.", self.simple_t,
                                            tip="Hides subtitles for any app, learning mode, Catch me up and Save subtitles, "
                                                "in this window and in the extension popup. Subtle Lite always works like this.")
-        self.check_upd = Toggle(c, lambda v: self.save(check_updates=v))
-        self.setting_row(al, "Tell me about new versions", "Once a day Subtle asks GitHub for the newest version number. Nothing else is sent.", self.check_upd)
         lay.addWidget(ac)
 
-        self.section(lay, "Files and logs")
-        fc, fl = self.card()
+        uc, ul = self.card((22, 18, 22, 18))
+        self.check_btn = self.button("Check now", self.check_updates, small=True)
+        self.head(ul, "update", "Updates", right=(self.check_btn,))
+        self.upd_state = self.label("", "small", wrap=True)
+        ul.addWidget(self.upd_state)
+        self.check_upd = Toggle(c, lambda v: self.save(check_updates=v))
+        self.setting_row(ul, "Tell me about new versions", "Once a day Subtle asks GitHub for the newest version number. "
+                                                           "Nothing else is sent.", self.check_upd)
+        lay.addWidget(uc)
+
+        fc, fl = self.card((22, 18, 22, 18))
+        self.head(fl, "folder", "Files and logs")
         self.setting_row(fl, "Saved transcripts", "Only when 'Save transcripts' is on in the extension popup.",
                          self.button("Open folder", lambda: self.cmd("open", what="transcripts"), small=True), first=True)
         self.setting_row(fl, "Error log", "Errors only - never what was said.",
@@ -1804,11 +1990,26 @@ class ControlPanel:
         fl.addWidget(self.log)
         lay.addWidget(fc)
 
-        self.section(lay, "Quit")
-        qc, ql = self.card()
-        self.setting_row(ql, "Quit Subtle", "Closing this window keeps Subtle in the tray. Quit stops it completely.",
-                         self.button("Quit Subtle", self.ask_quit, "danger", small=True), first=True)
+        qc, ql = self.card((22, 18, 22, 18))
+        self.head(ql, "stop", "Quit Subtle", tone="bad",
+                  sub="Closing this window keeps Subtle in the tray. Quit stops it completely.",
+                  right=(self.button("Quit Subtle", self.ask_quit, "danger", small=True),))
         lay.addWidget(qc)
+
+    def check_updates(self):
+        self.check_btn.setEnabled(False)
+        self.set_text(self.upd_state, "Checking…")
+
+        def done(r):
+            self.check_btn.setEnabled(True)
+            if r.get("error"):
+                self.set_text(self.upd_state, r["error"])
+            elif r.get("update"):
+                self.set_text(self.upd_state, f"Subtle {r['update']['version']} is available: see the Home page.")
+                self.refresh()
+            else:
+                self.set_text(self.upd_state, f"You have the newest version ({r.get('version', '')}).")
+        self.cmd("check_update", done)
 
     def render_settings(self):
         s = self.st.get("settings", {})
@@ -1829,6 +2030,10 @@ class ControlPanel:
         self.scan_lms.set_value(s.get("scan_lmstudio", True))
         self.check_upd.set_value(s.get("check_updates", True))
         self.simple_t.set_value(bool(self.st.get("simple")))
+        if not self.upd_state.text():
+            up = self.st.get("update") or {}
+            self.set_text(self.upd_state, f"Subtle {up['version']} is available: see the Home page." if up.get("version")
+                          else f"You have version {self.st.get('version', '')}.")
         self.simple_t.setEnabled(not self.st.get("lite"))
         self.auto.set_value(self.st.get("autostart"))
 
@@ -1893,7 +2098,8 @@ class ControlPanel:
             row.addWidget(extra, 0, Qt.AlignTop)
         body.addLayout(row)
 
-    def _setup(self, lay):
+    def _help(self, lay):
+        self.section(lay, "Get started", top=0)
         b, self.step1_num, self.step1_state = self._step(lay, 1, "Get the models for your PC")
         self.setup_gpu = self.label("", "muted", wrap=True)
         b.addWidget(self.setup_gpu)
@@ -1908,8 +2114,8 @@ class ControlPanel:
         b.addSpacing(4)
         b.addLayout(r)
 
-        b, _, _ = self._step(lay, 2, "Add Subtle to your browser (Chrome, Edge, Brave, Opera, Vivaldi or another Chromium browser)")
-        self._numbered(b, 1, "Open a new browser tab and go to  chrome://extensions   (works in every Chromium browser)",
+        b, _, _ = self._step(lay, 2, "Add Subtle to your browser")
+        self._numbered(b, 1, "Open a new browser tab and go to  chrome://extensions   (Chrome, Edge, Brave, Opera, Vivaldi).",
                        self.button("Copy address", lambda: self.copy("chrome://extensions"), small=True))
         self._numbered(b, 2, "Turn on Developer mode (a switch at the top right; in Edge it is on the left).")
         self._numbered(b, 3, "Click Load unpacked and choose Subtle's extension folder:")
@@ -1923,7 +2129,8 @@ class ControlPanel:
         pr.addWidget(self.button("Open folder", lambda: self.cmd("open", what="extension"), small=True))
         pr.addStretch(1)
         b.addLayout(pr)
-        self._numbered(b, 4, "Optional: on the extension's Details page, turn on Allow in Incognito (Private / InPrivate).")
+        self._numbered(b, 4, "Firefox: open about:debugging, This Firefox, Load Temporary Add-on, and choose "
+                             "manifest.json in the extension-firefox folder.")
 
         b, _, _ = self._step(lay, 3, "Watch something")
         for i, text in enumerate((
@@ -1934,6 +2141,40 @@ class ControlPanel:
             self._numbered(b, i, text)
         b.addSpacing(6)
         b.addWidget(self.button("Done - go to Home", self.finish_setup, "primary"), 0, Qt.AlignLeft)
+
+        kc, kl = self.card((22, 18, 22, 18))
+        self.head(kl, "grid", "Shortcuts", sub="In the browser. Change them at chrome://extensions/shortcuts.")
+        keys = QGridLayout()
+        keys.setHorizontalSpacing(18)
+        keys.setVerticalSpacing(6)
+        for i, (k, what) in enumerate((("Alt + Shift + S", "Start or stop subtitles"), ("Alt + Shift + H", "Hide or show them"),
+                                       ("Alt + Shift + L", "Show the last line again"), ("Alt + Shift + U", "Catch me up"))):
+            kk = QLabel(k)
+            kk.setStyleSheet(f"background: {self.c['field']}; border: 1px solid {self.c['line']}; border-radius: 6px; "
+                             f"padding: 3px 8px; font-family: Consolas; font-size: 9pt;")
+            keys.addWidget(kk, i, 0, Qt.AlignLeft)
+            keys.addWidget(self.label(what, "muted"), i, 1)
+        keys.setColumnStretch(1, 1)
+        kl.addLayout(keys)
+        kl.addWidget(self.label("Drag the subtitles on the video to move them; double-click puts them back.", "small", wrap=True))
+        lay.addWidget(kc)
+
+        hc, hl = self.card((22, 18, 22, 18))
+        self.head(hl, "help", "Something not working?")
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(self.button("Read the guide", lambda: QDesktopServices.openUrl(QUrl("https://github.com/ddsaamir/subtle#readme"))))
+        row.addWidget(self.button("Report a problem", lambda: QDesktopServices.openUrl(QUrl("https://github.com/ddsaamir/subtle/issues"))))
+        row.addWidget(self.button("Open the logs", lambda: self.cmd("open", what="logs")))
+        row.addStretch(1)
+        hl.addLayout(row)
+        lay.addWidget(hc)
+
+        ab, abl = self.card((22, 18, 22, 18))
+        self.head(abl, "star", "About Subtle", tone="muted",
+                  sub="Free and open source (MIT). Speech recognition and translation run on your own PC; nothing "
+                      "you watch is sent anywhere. Models come from their authors under their own licenses.")
+        lay.addWidget(ab)
 
     def render_setup(self):
         st = self.st
@@ -1980,7 +2221,7 @@ class ControlPanel:
         self.render_side()
         if full or self.page == "home":
             self.render_home()
-        if full or (self.dl_rows and self.page in ("models", "setup")) or any(
+        if full or (self.dl_rows and self.page in ("models", "help")) or any(
                 j["state"] in ("queued", "downloading", "verifying") for j in st.get("downloads", [])):
             self.render_downloads()
         if full:
@@ -1990,8 +2231,8 @@ class ControlPanel:
             self.render_setup()
             if not st.get("settings", {}).get("first_run_done") and not self._setup_shown:
                 self._setup_shown = True
-                self.go("setup")
-        elif self.page == "translator":
+                self.go("help")
+        elif self.page == "languages":
             self.render_llm_status()
 
 
