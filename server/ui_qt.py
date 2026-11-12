@@ -565,6 +565,7 @@ class ControlPanel:
         QComboBox {{ background: {c['field']}; border: 1px solid {c['line']}; border-radius: 8px; padding: 6px 10px;
                      min-height: 20px; }}
         QComboBox:hover {{ border-color: {c['faint']}; }}
+        QComboBox:disabled {{ color: {c['faint']}; }}
         QComboBox::drop-down {{ border: none; width: 26px; }}
         QComboBox::down-arrow {{ image: url("{(ASSETS / ('chevron-dark.png' if self.dark else 'chevron-light.png')).as_posix()}");
                                  width: 12px; height: 12px; margin-right: 10px; }}
@@ -1169,11 +1170,13 @@ class ControlPanel:
         ll.addLayout(grid)
         lay.addWidget(lc)
 
-        from overlay_qt import BG_COLORS, EDGES, FONTS, PRESETS, TEXT_COLORS, TIMES, WEIGHTS, SubtitlePreview
+        from overlay_qt import (BG_COLORS, DEFAULTS, EDGES, FONTS, POSITION_KEYS, PRESETS, STYLE_KEYS, TEXT_COLORS,
+                                TIMES, WEIGHTS, SubtitlePreview)
         vc, vl = self.card((22, 18, 22, 18))
+        self.pc_reset_all = self.button("Reset everything", lambda: self.pc_save(False, **DEFAULTS), small=True)
         self.head(vl, "look", "How the subtitles look",
                   sub="Changes show right away, also while subtitles run. Drag the subtitles in the picture to "
-                      "place them on your screen.")
+                      "place them on your screen.", right=(self.pc_reset_all,))
         self.pc_preview = SubtitlePreview(on_moved=lambda ch: self.pc_save(False, **ch))
         vl.addWidget(self.pc_preview)
         presets = QHBoxLayout()
@@ -1185,6 +1188,9 @@ class ControlPanel:
             presets.addWidget(b)
             self.pc_presets[key] = (b, values)
         presets.addStretch(1)
+        self.pc_reset_style = self.button("Reset style", lambda: self.pc_save(
+            False, **{k: DEFAULTS[k] for k in STYLE_KEYS}), small=True)
+        presets.addWidget(self.pc_reset_style)
         vl.addSpacing(6)
         vl.addLayout(presets)
 
@@ -1211,7 +1217,9 @@ class ControlPanel:
             [("Font", look("pc_font", [(k, v[0]) for k, v in FONTS.items()])),
              ("Weight", look("pc_weight", [(k, v[0]) for k, v in WEIGHTS.items()])),
              ("Lines stay", look("pc_line_time", [(k, v[0]) for k, v in TIMES.items()])),
-             ("Original line size", look("pc_src_size", [(v, f"{v}%") for v in (50, 60, 70, 85, 100)]))],
+             # picking a size also shows the original line (that is what it is for)
+             ("Original line size", look("pc_src_size", [(v, f"{v}%") for v in (50, 60, 70, 85, 100)],
+                                         extra={"pc_show_src": True}))],
         ]
         for key, colours in (("pc_text_color", TEXT_COLORS), ("pc_bg_color", BG_COLORS)):
             cb = self.pc_look[key]
@@ -1232,7 +1240,8 @@ class ControlPanel:
         self.pc_keep_t = Toggle(c, lambda v: self.pc_save(False, pc_keep_prev=v))
         self.pc_src_t = Toggle(c, lambda v: self.pc_save(False, pc_show_src=v))
         self.pc_move_btn = self.button("Move on screen", self.pc_move_toggle, small=True)
-        self.pc_reset_btn = self.button("Reset", lambda: self.pc_save(False, pc_x=500, pc_y=-1, pc_height=8), small=True)
+        self.pc_reset_btn = self.button("Reset position", lambda: self.pc_save(
+            False, **{k: DEFAULTS[k] for k in POSITION_KEYS}), small=True)
         place = QWidget()
         pl = QHBoxLayout(place)
         pl.setContentsMargins(0, 0, 0, 0)
@@ -1240,8 +1249,8 @@ class ControlPanel:
         pl.addWidget(self.pc_reset_btn)
         pl.addWidget(self.pc_move_btn)
         self.setting_row(vl, "Place them on your screen", "Shows the subtitles as a box on your screen: drag it over "
-                         "the app you watch, then double-click it or press Enter. Reset puts them back at the bottom "
-                         "in the middle.", place)
+                         "the app you watch, then double-click it or press Enter. Reset position puts them back at "
+                         "the bottom in the middle.", place)
         self.setting_row(vl, "Keep the previous line", "Shows the line before, dimmed, above the new one.",
                          self.pc_keep_t)
         self.setting_row(vl, "Show the original line", "The words as spoken, under the translation (Best engine).",
@@ -1336,7 +1345,7 @@ class ControlPanel:
         hide = bool(st.get("simple")) and not pc.get("running")
         self.nav["anyapp"].setVisible(not hide)
         self.simple_hint.setVisible(hide)
-        from overlay_qt import style_from
+        from overlay_qt import DEFAULTS, POSITION_KEYS, STYLE_KEYS, style_from
         look = style_from(s)
         self.pc_preview.set_style(s)
         self.set_combo(self.pc_lang, s.get("pc_language", "ja"))
@@ -1350,7 +1359,9 @@ class ControlPanel:
         if not moved and all(v != look["pc_height"] for v, _ in heights):     # a height from an older version
             heights.append((look["pc_height"], f"{look['pc_height']}% up"))
         self.fill_combo(self.pc_look["pc_height"], heights + ([("moved", "Moved by hand")] if moved else []))
-        self.pc_reset_btn.setEnabled(moved or look["pc_height"] != 8)
+        self.pc_reset_btn.setEnabled(any(look[k] != DEFAULTS[k] for k in POSITION_KEYS))
+        self.pc_reset_style.setEnabled(any(look[k] != DEFAULTS[k] for k in STYLE_KEYS))
+        self.pc_reset_all.setEnabled(any(look[k] != DEFAULTS[k] for k in DEFAULTS))
         widths = [(v, f"{v}% of the screen") for v in (50, 60, 70, 80, 90, 100)]
         if all(v != look["pc_width"] for v, _ in widths):              # set by dragging the box's edge
             widths = sorted(widths + [(look["pc_width"], f"{look['pc_width']}% of the screen")])
@@ -1359,7 +1370,6 @@ class ControlPanel:
             self.set_combo(cb, "moved" if key == "pc_height" and moved else look[key])
         self.pc_keep_t.set_value(bool(look["pc_keep_prev"]))
         self.pc_src_t.set_value(bool(look["pc_show_src"]))
-        self.pc_look["pc_src_size"].setEnabled(bool(look["pc_show_src"]))
         for b, values in self.pc_presets.values():
             self.restyle(b, active="true" if all(look[k] == v for k, v in values.items()) else "false")
         if not self._pc_devices_loaded:

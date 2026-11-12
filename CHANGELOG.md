@@ -5,6 +5,19 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-12
+
+### Added
+- The Any app preview is your screen in miniature: its real shape, with the subtitles at true scale. In it,
+  as on the screen box: drag to move (hold **Shift** to keep them centred), drag the left or right edge for
+  the line width, use the mouse wheel for the text size.
+- **Reset position**, **Reset style** and **Reset everything** buttons.
+
+### Fixed
+- **Original line size** could not be picked while the original line was off; picking a size now also
+  shows the original line.
+- A refresh of the page during a drag in the preview could put the subtitles back where they were.
+
 ## [0.13.1] - 2026-11-12
 
 ### Fixed
@@ -189,7 +202,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/ddsaamir/subtle/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/ddsaamir/subtle/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/ddsaamir/subtle/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ddsaamir/subtle/compare/v0.11.2...v0.12.0
