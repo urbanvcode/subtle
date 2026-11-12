@@ -5,6 +5,17 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-12
+
+### Added
+- **Subtitle styles for Any app**, the same as in the browser: quick styles (Classic box, Outline, Soft
+  shadow, High contrast), text and box colour, box strength, edge (none, soft shadow, outline, drop
+  shadow), font, weight, line width, how long lines stay, and the size of the original line.
+- **Show the original line** under the translation on screen (Best engine), and a switch for keeping the
+  previous line above the new one.
+- The preview on the Any app page is drawn exactly as the subtitles on screen, with the previous and
+  original lines when they are switched on.
+
 ## [0.11.2] - 2026-11-12
 
 ### Changed
@@ -151,7 +162,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/ddsaamir/subtle/compare/v0.11.2...v0.12.0
 [0.11.2]: https://github.com/ddsaamir/subtle/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/ddsaamir/subtle/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ddsaamir/subtle/compare/v0.10.0...v0.11.0

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from PySide6.QtCore import (QEasingCurve, QEvent, QObject, QPropertyAnimation, QRectF, QSize, Qt, QTimer, QUrl, Signal,
                             Property)
-from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter, QPen
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget)
@@ -1168,35 +1168,64 @@ class ControlPanel:
         ll.addLayout(grid)
         lay.addWidget(lc)
 
+        from overlay_qt import BG_COLORS, EDGES, FONTS, PRESETS, TEXT_COLORS, TIMES, WEIGHTS, SubtitlePreview
         vc, vl = self.card((22, 18, 22, 18))
         self.head(vl, "look", "How the subtitles look", sub="Changes show right away, also while subtitles run.")
-        self.pc_preview = QFrame()
-        self.pc_preview.setObjectName("preview")
-        self.pc_preview.setMinimumHeight(110)
-        pv = QVBoxLayout(self.pc_preview)
-        pv.setContentsMargins(12, 10, 12, 12)
-        pv.addStretch(1)
-        self.pc_sample = QLabel("Where were you last night?")
-        self.pc_sample.setAlignment(Qt.AlignCenter)
-        pv.addWidget(self.pc_sample, 0, Qt.AlignHCenter)
-        self.pc_preview_space = pv
+        self.pc_preview = SubtitlePreview()
         vl.addWidget(self.pc_preview)
+        presets = QHBoxLayout()
+        presets.setSpacing(6)
+        presets.addWidget(self.label("Quick styles", "small"))
+        self.pc_presets = {}
+        for key, (title, values) in PRESETS.items():
+            b = self.chip(title, lambda v=values: self.pc_save(False, **v))
+            presets.addWidget(b)
+            self.pc_presets[key] = (b, values)
+        presets.addStretch(1)
+        vl.addSpacing(6)
+        vl.addLayout(presets)
+
+        def look(key, choices):
+            cb = self.combo(choices, lambda v: self.pc_save(False, **{key: v}))
+            self.pc_look[key] = cb
+            return cb
+        self.pc_look = {}
+        rows = [
+            [("Text size", look("pc_size", [(v, f"{v}%") for v in (70, 85, 100, 125, 150, 200)])),
+             ("Position", look("pc_height", [(v, f"{v}% up") for v in (2, 5, 8, 12, 20, 30, 45)])),
+             ("Line width", look("pc_width", [(v, f"{v}% of the screen") for v in (50, 60, 70, 80, 90, 100)])),
+             ("Screen", look("pc_screen", [(0, "Main screen")]))],
+            [("Text colour", look("pc_text_color", TEXT_COLORS)),
+             ("Box colour", look("pc_bg_color", BG_COLORS)),
+             ("Box", look("pc_opacity", [(0, "No box")] + [(v, f"{v}% solid") for v in (30, 45, 62, 80, 92, 100)])),
+             ("Edge", look("pc_edge", list(EDGES.items())))],
+            [("Font", look("pc_font", [(k, v[0]) for k, v in FONTS.items()])),
+             ("Weight", look("pc_weight", [(k, v[0]) for k, v in WEIGHTS.items()])),
+             ("Lines stay", look("pc_line_time", [(k, v[0]) for k, v in TIMES.items()])),
+             ("Original line size", look("pc_src_size", [(v, f"{v}%") for v in (50, 60, 70, 85, 100)]))],
+        ]
+        for key, colours in (("pc_text_color", TEXT_COLORS), ("pc_bg_color", BG_COLORS)):
+            cb = self.pc_look[key]
+            for i, (hexv, _) in enumerate(colours):
+                cb.setItemIcon(i, self.swatch(hexv))
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(4)
-        self.pc_size = self.combo([(v, f"{v}%") for v in (70, 85, 100, 125, 150, 200)],
-                                  lambda v: self.pc_save(False, pc_size=v))
-        self.pc_height = self.combo([(v, f"{v}% up") for v in (2, 5, 8, 12, 20, 30, 45)],
-                                    lambda v: self.pc_save(False, pc_height=v))
-        self.pc_opacity = self.combo([(v, f"{v}%") for v in (0, 30, 45, 62, 80, 100)],
-                                     lambda v: self.pc_save(False, pc_opacity=v))
-        self.pc_screen = self.combo([(0, "Main screen")], lambda v: self.pc_save(False, pc_screen=v))
-        for col, (title, w) in enumerate((("Text size", self.pc_size), ("Position", self.pc_height),
-                                          ("Box", self.pc_opacity), ("Screen", self.pc_screen))):
-            grid.addWidget(self.label(title, "small"), 0, col)
-            grid.addWidget(w, 1, col)
-            grid.setColumnStretch(col, 1)
+        for r, row in enumerate(rows):
+            for col, (title, w) in enumerate(row):
+                grid.addWidget(self.label(title, "small"), 2 * r, col)
+                grid.addWidget(w, 2 * r + 1, col)
+                grid.setColumnStretch(col, 1)
+            if r:
+                grid.setRowMinimumHeight(2 * r, 26)        # a little air between the rows of controls
+        vl.addSpacing(8)
         vl.addLayout(grid)
+        self.pc_keep_t = Toggle(c, lambda v: self.pc_save(False, pc_keep_prev=v))
+        self.pc_src_t = Toggle(c, lambda v: self.pc_save(False, pc_show_src=v))
+        self.setting_row(vl, "Keep the previous line", "Shows the line before, dimmed, above the new one.",
+                         self.pc_keep_t)
+        self.setting_row(vl, "Show the original line", "The words as spoken, under the translation (Best engine).",
+                         self.pc_src_t)
         lay.addWidget(vc)
         self.overlay = None
         self._pc_devices_loaded = False
@@ -1224,16 +1253,32 @@ class ControlPanel:
             self.refresh(True)
         self.cmd("settings", after, changes=changes)
 
+    def swatch(self, hexv, px=14):
+        pm = QPixmap(px, px)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(QPen(QColor(self.c["line"]), 1))
+        p.setBrush(QColor(hexv))
+        p.drawRoundedRect(QRectF(0.5, 0.5, px - 1, px - 1), 3, 3)
+        p.end()
+        return QIcon(pm)
+
     def pc_apply_style(self):
         s = self.st.get("settings", {})
+        self.pc_preview.set_style(s)
         if self.overlay is None:
+            if not (self.st.get("pc") or {}).get("running"):
+                return                   # no subtitle window until subtitles start
             from overlay_qt import SubtitleOverlay
             self.overlay = SubtitleOverlay()
-        self.overlay.apply_style(s.get("pc_size", 100), s.get("pc_height", 8), s.get("pc_opacity", 62), s.get("pc_screen", 0))
+        self.overlay.apply_style(s)
 
     def pc_message(self, msg):
         if self.overlay is None:
-            self.pc_apply_style()
+            from overlay_qt import SubtitleOverlay
+            self.overlay = SubtitleOverlay()
+            self.overlay.apply_style(self.st.get("settings", {}))
         self.overlay.on_message(msg)
 
     def pc_load_sources(self):
@@ -1256,20 +1301,22 @@ class ControlPanel:
         hide = bool(st.get("simple")) and not pc.get("running")
         self.nav["anyapp"].setVisible(not hide)
         self.simple_hint.setVisible(hide)
-        alpha = max(0, min(100, int(s.get("pc_opacity", 62)))) / 100
-        px = int(18 * int(s.get("pc_size", 100)) / 100)
-        self.pc_sample.setStyleSheet(f"color: #ffffff; background: rgba(8, 8, 12, {alpha:.2f}); border-radius: {px // 4}px; "
-                                     f"padding: {px // 6}px {px // 2}px; font-size: {px}px; font-weight: 600;")
-        self.pc_preview_space.setContentsMargins(12, 10, 12, max(4, int(110 * int(s.get("pc_height", 8)) / 100)))
+        from overlay_qt import style_from
+        look = style_from(s)
+        self.pc_preview.set_style(s)
         self.set_combo(self.pc_lang, s.get("pc_language", "ja"))
         self.set_combo(self.pc_target, s.get("pc_target", "en"))
         self.set_combo(self.pc_mode, s.get("pc_mode", "whisper"))
-        self.set_combo(self.pc_size, s.get("pc_size", 100))
-        self.set_combo(self.pc_height, s.get("pc_height", 8))
-        self.set_combo(self.pc_opacity, s.get("pc_opacity", 62))
         screens = QApplication.screens()
-        self.fill_combo(self.pc_screen, [(i, "Main screen" if i == 0 else f"Screen {i + 1}") for i in range(len(screens))],
-                        s.get("pc_screen", 0))
+        self.fill_combo(self.pc_look["pc_screen"],
+                        [(i, "Main screen" if i == 0 else f"Screen {i + 1}") for i in range(len(screens))])
+        for key, cb in self.pc_look.items():
+            self.set_combo(cb, look[key])
+        self.pc_keep_t.set_value(bool(look["pc_keep_prev"]))
+        self.pc_src_t.set_value(bool(look["pc_show_src"]))
+        self.pc_look["pc_src_size"].setEnabled(bool(look["pc_show_src"]))
+        for b, values in self.pc_presets.values():
+            self.restyle(b, active="true" if all(look[k] == v for k, v in values.items()) else "false")
         if not self._pc_devices_loaded:
             self._pc_devices_loaded = True
             self.pc_load_sources()

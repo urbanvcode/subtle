@@ -37,6 +37,16 @@ DEFAULTS = {
     "pc_height": 8,                      # % of the screen height above the bottom
     "pc_opacity": 62,                    # box behind the text, %
     "pc_screen": 0,                      # which monitor (0 = main)
+    "pc_width": 80,                      # % of the screen width a line may use
+    "pc_text_color": "#ffffff",
+    "pc_bg_color": "#08080c",
+    "pc_edge": "soft",                   # none | soft | outline | drop
+    "pc_font": "default",                # default | arial | verdana | trebuchet | georgia | mono
+    "pc_weight": "semibold",             # regular | semibold | bold
+    "pc_line_time": "normal",            # short | normal | long: how long a finished line stays
+    "pc_keep_prev": True,                # the previous line, dimmed, above the new one
+    "pc_show_src": False,                # the original-language line under the translation
+    "pc_src_size": 70,                   # % size of the original line
     # App
     "open_panel_on_start": True,
     "check_updates": True,               # once a day: ask GitHub for the newest Subtle version (nothing else is sent)
