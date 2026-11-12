@@ -5,6 +5,16 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-12
+
+### Fixed
+- **Move on screen** works: the box could not be dragged, and double-click or Enter did nothing, because
+  Windows kept the subtitles click-through. The box is now a window of its own.
+
+### Added
+- While moving: drag the box's left or right edge to change the line width, and use the mouse wheel for
+  the text size. Subtitles that are running show live in the box.
+
 ## [0.13.0] - 2026-11-12
 
 ### Added
@@ -179,7 +189,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/ddsaamir/subtle/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/ddsaamir/subtle/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ddsaamir/subtle/compare/v0.11.2...v0.12.0
 [0.11.2]: https://github.com/ddsaamir/subtle/compare/v0.11.1...v0.11.2

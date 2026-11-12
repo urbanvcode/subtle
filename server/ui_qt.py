@@ -1351,6 +1351,10 @@ class ControlPanel:
             heights.append((look["pc_height"], f"{look['pc_height']}% up"))
         self.fill_combo(self.pc_look["pc_height"], heights + ([("moved", "Moved by hand")] if moved else []))
         self.pc_reset_btn.setEnabled(moved or look["pc_height"] != 8)
+        widths = [(v, f"{v}% of the screen") for v in (50, 60, 70, 80, 90, 100)]
+        if all(v != look["pc_width"] for v, _ in widths):              # set by dragging the box's edge
+            widths = sorted(widths + [(look["pc_width"], f"{look['pc_width']}% of the screen")])
+        self.fill_combo(self.pc_look["pc_width"], widths)
         for key, cb in self.pc_look.items():
             self.set_combo(cb, "moved" if key == "pc_height" and moved else look[key])
         self.pc_keep_t.set_value(bool(look["pc_keep_prev"]))

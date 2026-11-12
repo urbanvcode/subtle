@@ -178,16 +178,17 @@ class Painter:
 
 
 class SubtitleOverlay(QWidget):
-    BASE = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoDropShadowWindowHint
-    CLICK_THROUGH = Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus
     ACCENT = QColor("#2fbf8f")
 
     def __init__(self):
-        super().__init__(None, self.BASE | self.CLICK_THROUGH)
-        self.moving = False                # "Move on screen": a box to drag, instead of click-through text
+        # always click-through: "Move on screen" uses its own window (MoveBox), as Windows doesn't let a
+        # window stop being click-through once it is shown
+        flags = (Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WindowTransparentForInput
+                 | Qt.WindowDoesNotAcceptFocus | Qt.NoDropShadowWindowHint)
+        super().__init__(None, flags)
+        self.moving = False
+        self.mover: MoveBox | None = None
         self.on_moved = self.on_done = None
-        self.drag = None
-        self.box = QRectF()
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -220,8 +221,10 @@ class SubtitleOverlay(QWidget):
         cx, bottom, w = placement(s, g.width(), g.height())
         # tall enough for a few wrapped lines above the bottom, never above the top of the screen
         h = int(max(self.font_px * 4, min(g.height() * 0.45, bottom)))
-        if not self.drag:
+        if not (self.mover and self.mover.drag):
             self.setGeometry(int(g.left() + cx - w / 2), int(g.top() + bottom - h), int(w), h)
+            if self.mover:
+                self.mover.setGeometry(self.geometry())
         if not s["pc_keep_prev"]:
             self.lines["prev"] = None
         if not s["pc_show_src"]:
@@ -232,15 +235,16 @@ class SubtitleOverlay(QWidget):
         """Wrap the visible lines (only when text or look changes: painting then just draws them)."""
         px, w, pt = self.font_px, self.width(), self.painter
         self.blocks = []
-        if self.moving and not self.lines["cur"]:          # something to see while placing the box
-            sample = SubtitlePreview.SAMPLE
+        sample = self.moving and not self.lines["cur"]     # something to see while placing the box
+        if sample:
+            text = SubtitlePreview.SAMPLE
             if pt.s["pc_keep_prev"]:
-                self.blocks.append(pt.block(sample[0], px * .82, w, "", .7))
-            self.blocks.append(pt.block(sample[1], px, w))
+                self.blocks.append(pt.block(text[0], px * .82, w, "", .7))
+            self.blocks.append(pt.block(text[1], px, w))
             if pt.s["pc_show_src"]:
-                self.blocks.append(pt.block(sample[2], px * max(40, min(100, int(pt.s["pc_src_size"]))) / 100, w,
+                self.blocks.append(pt.block(text[2], px * max(40, min(100, int(pt.s["pc_src_size"]))) / 100, w,
                                             "", .9, weight=QFont.Medium))
-        if self.lines["prev"] and not (self.moving and not self.lines["cur"]):
+        if self.lines["prev"] and not sample:
             text, colour = self.lines["prev"]
             self.blocks.append(pt.block(text, px * .82, w, colour, .7))
         if self.lines["cur"]:
@@ -250,7 +254,11 @@ class SubtitleOverlay(QWidget):
             text, _ = self.lines["src"]
             self.blocks.append(pt.block(text, px * max(40, min(100, int(pt.s["pc_src_size"]))) / 100, w, "", .9,
                                         weight=QFont.Medium))
-        if self.blocks:
+        if self.moving:                    # the drag box shows the lines (live ones too) meanwhile
+            if self.isVisible():
+                self.hide()
+            self.mover.update()
+        elif self.blocks:
             if not self.isVisible():
                 self.show()
             self.raise_()
@@ -263,80 +271,37 @@ class SubtitleOverlay(QWidget):
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        if self.moving:
-            # the box to drag: the lines' area, tinted (a see-through pixel would let the click through)
-            gap = self.font_px * .18
-            h = sum(b["h"] for b in self.blocks) + gap * (len(self.blocks) - 1) + self.font_px * .5
-            self.box = QRectF(2, self.height() - 2 - h, self.width() - 4, h)
-            fill = QColor(self.ACCENT)
-            fill.setAlpha(46)
-            p.setBrush(fill)
-            p.setPen(QPen(self.ACCENT, 2, Qt.DashLine))
-            p.drawRoundedRect(self.box, 10, 10)
-            hint = "Drag to move  ·  double-click or press Enter when done"
-            f = QFont()
-            f.setPixelSize(max(13, int(self.font_px * .45)))
-            f.setWeight(QFont.DemiBold)
-            fm = QFontMetricsF(f)
-            hw, hh = fm.horizontalAdvance(hint) + 24, fm.height() + 10
-            pill = QRectF((self.width() - hw) / 2, max(0, self.box.top() - hh - 8), hw, hh)
-            p.setPen(Qt.NoPen)
-            p.setBrush(self.ACCENT)
-            p.drawRoundedRect(pill, hh / 2, hh / 2)
-            p.setPen(QColor("#06261b"))
-            p.setFont(f)
-            p.drawText(pill, Qt.AlignCenter, hint)
-        self.painter.stack(p, self.blocks, self.width() / 2, self.height() - 2 - (self.font_px * .25 if self.moving else 0))
+        self.painter.stack(p, self.blocks, self.width() / 2, self.height() - 2)
         p.end()
 
     # -- "Move on screen" ---------------------------------------------------------------------------
     def set_move_mode(self, on: bool, on_moved=None, on_done=None):
-        """on: the subtitles become a box to drag (on_moved gets the new place as settings); off: click-through."""
+        """on: a box to drag (and resize) appears where the subtitles are; on_moved gets the new place as
+        settings. off: back to click-through subtitles."""
         if on == self.moving:
             return
-        self.moving, self.drag = on, None
+        self.moving = on
         if on:
             self.on_moved, self.on_done = on_moved, on_done
-        self.setWindowFlags(self.BASE if on else self.BASE | self.CLICK_THROUGH)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, not on)
-        self.setAttribute(Qt.WA_ShowWithoutActivating, not on)
-        self.setCursor(Qt.SizeAllCursor if on else Qt.ArrowCursor)
-        self._relayout()
-        if on:
-            self.show()
-            self.raise_()
-            self.activateWindow()
-            self.setFocus()
+            self.mover = MoveBox(self)
+            self.mover.setGeometry(self.geometry())
+            self._relayout()
+            self.mover.show()
+            self.mover.raise_()
+            self.mover.activateWindow()
+            self.mover.setFocus()
         else:
+            mover, self.mover = self.mover, None
+            if mover is not None:
+                mover.close()
+                mover.deleteLater()
+            self._relayout()
             done, self.on_done = self.on_done, None
             if done:
                 done()
 
-    def mousePressEvent(self, e):
-        if self.moving and e.button() == Qt.LeftButton and self.box.contains(e.position()):
-            self.drag = (e.globalPosition().toPoint(), self.pos())
-
-    def mouseMoveEvent(self, e):
-        if self.drag:
-            start, pos = self.drag
-            self.move(pos + e.globalPosition().toPoint() - start)
-
-    def mouseReleaseEvent(self, e):
-        if self.drag:
-            self.drag = None
-            self._commit_place()
-
-    def mouseDoubleClickEvent(self, e):
-        if self.moving:
-            self.set_move_mode(False)
-
-    def keyPressEvent(self, e):
-        if self.moving and e.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape):
-            self.set_move_mode(False)
-
-    def _commit_place(self):
-        """Where the box was dropped -> pc_screen, pc_x (centre, ‰ of the width), pc_y (bottom, ‰ up)."""
-        geo = self.frameGeometry()
+    def commit_place(self, geo: QRect, width_changed=False):
+        """Where the box was dropped -> pc_screen, pc_x (centre, ‰ of the width), pc_y (bottom, ‰ up), pc_width."""
         centre = geo.center()
         screens = QGuiApplication.screens()
         scr = QGuiApplication.screenAt(centre) or self._screen(int(self.painter.s["pc_screen"] or 0))
@@ -347,8 +312,17 @@ class SubtitleOverlay(QWidget):
         y = round((g.top() + g.height() - (geo.top() + geo.height())) / g.height() * 1000)
         changes = {"pc_screen": screens.index(scr) if scr in screens else 0,
                    "pc_x": max(0, min(1000, x)), "pc_y": max(0, min(950, y))}
+        if width_changed:
+            changes["pc_width"] = max(30, min(100, round(geo.width() / g.width() * 100)))
         if self.on_moved:
             self.on_moved(changes)
+
+    def step_size(self, up: bool):
+        sizes = (70, 85, 100, 125, 150, 200)
+        cur = int(self.painter.s["pc_size"] or 100)
+        nxt = [v for v in sizes if v > cur] if up else [v for v in sizes if v < cur][::-1]
+        if nxt and self.on_moved:
+            self.on_moved({"pc_size": nxt[0]})
 
     def _set(self, key, value):
         self.lines[key] = value
@@ -399,6 +373,104 @@ class SubtitleOverlay(QWidget):
         if self.lines["cur"] and not self.partial and self.painter.s["pc_keep_prev"]:
             self.lines["prev"] = self.lines["cur"]
             self.prev_timer.start(int(4000 * self.painter.time))
+
+
+class MoveBox(QWidget):
+    """'Move on screen': a normal (clickable) see-through window over the subtitles. Drag the box to move
+    them, its left or right edge to change the line width, the mouse wheel for the text size; double-click,
+    Enter or Esc when done. It shows the overlay's lines (live ones while subtitles run)."""
+
+    EDGE = 14
+
+    def __init__(self, overlay: "SubtitleOverlay"):
+        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoDropShadowWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowTitle("Move Subtle subtitles")
+        self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.ov = overlay
+        self.drag = None                   # (kind, start in screen coordinates, geometry at the start)
+        self.box = QRectF()
+
+    def paintEvent(self, e):
+        ov = self.ov
+        px = ov.font_px
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        gap = px * .18
+        h = sum(b["h"] for b in ov.blocks) + gap * max(0, len(ov.blocks) - 1) + px * .5 if ov.blocks else px * 1.8
+        # tinted, not see-through: a fully see-through pixel would let the click go to the window underneath
+        self.box = QRectF(2, self.height() - 2 - h, self.width() - 4, h)
+        fill = QColor(ov.ACCENT)
+        fill.setAlpha(56)
+        p.setBrush(fill)
+        p.setPen(QPen(ov.ACCENT, 2, Qt.DashLine))
+        p.drawRoundedRect(self.box, 10, 10)
+        p.setPen(Qt.NoPen)
+        p.setBrush(ov.ACCENT)
+        for x in (self.box.left() + 3, self.box.right() - 9):          # width handles
+            p.drawRoundedRect(QRectF(x, self.box.center().y() - px * .5, 6, px), 3, 3)
+        hint = "Drag to move  ·  edges: width  ·  wheel: size  ·  double-click or Enter when done"
+        f = QFont()
+        f.setPixelSize(max(13, int(px * .42)))
+        f.setWeight(QFont.DemiBold)
+        fm = QFontMetricsF(f)
+        hw, hh = min(self.width() - 4, fm.horizontalAdvance(hint) + 28), fm.height() + 10
+        pill = QRectF((self.width() - hw) / 2, max(0, self.box.top() - hh - 8), hw, hh)
+        p.drawRoundedRect(pill, hh / 2, hh / 2)
+        p.setPen(QColor("#06261b"))
+        p.setFont(f)
+        p.drawText(pill, Qt.AlignCenter, fm.elidedText(hint, Qt.ElideRight, hw - 20))
+        ov.painter.stack(p, ov.blocks, self.width() / 2, self.height() - 2 - px * .25)
+        p.end()
+
+    def _kind(self, pos) -> str | None:
+        if not self.box.adjusted(-4, 0, 4, 0).contains(pos):
+            return None
+        if pos.x() < self.box.left() + self.EDGE:
+            return "left"
+        if pos.x() > self.box.right() - self.EDGE:
+            return "right"
+        return "move"
+
+    def mousePressEvent(self, e):
+        kind = self._kind(e.position()) if e.button() == Qt.LeftButton else None
+        if kind:
+            self.drag = (kind, e.globalPosition().toPoint(), QRect(self.geometry()))
+
+    def mouseMoveEvent(self, e):
+        if not self.drag:
+            kind = self._kind(e.position())
+            self.setCursor(Qt.SizeHorCursor if kind in ("left", "right") else Qt.SizeAllCursor if kind else Qt.ArrowCursor)
+            return
+        kind, start, geo = self.drag
+        d = e.globalPosition().toPoint() - start
+        if kind == "move":
+            self.move(geo.topLeft() + d)
+            return
+        scr = QGuiApplication.screenAt(geo.center()) or QGuiApplication.primaryScreen()
+        grow = d.x() if kind == "right" else -d.x()          # both edges move: the lines stay centred
+        w = int(max(scr.geometry().width() * .3, min(scr.geometry().width(), geo.width() + 2 * grow)))
+        g = QRect(geo.center().x() - w // 2, geo.top(), w, geo.height())
+        self.setGeometry(g)
+        self.ov.setGeometry(g)             # the lines re-wrap to the new width as you drag
+        self.ov._relayout()
+
+    def mouseReleaseEvent(self, e):
+        if self.drag:
+            kind = self.drag[0]
+            self.ov.commit_place(self.frameGeometry(), width_changed=kind != "move")
+            self.drag = None
+
+    def wheelEvent(self, e):
+        self.ov.step_size(e.angleDelta().y() > 0)
+
+    def mouseDoubleClickEvent(self, e):
+        self.ov.set_move_mode(False)
+
+    def keyPressEvent(self, e):
+        if e.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape):
+            self.ov.set_move_mode(False)
 
 
 class SubtitlePreview(QWidget):
