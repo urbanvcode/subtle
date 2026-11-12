@@ -5,6 +5,17 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-12
+
+### Changed
+- **New model browser** in the Subtle window: every model is a card with ratings for **accuracy** and **speed**
+  (from our own benchmark), a **memory bar** measured against your graphics card, its languages, and an
+  (i) with the details (license, sizes, where it comes from). Filter by language (Japanese, Chinese,
+  Korean, any) or show only installed models; each tab shows how many are installed.
+- Small **(i) tips** on the Home page (subtitle delay, subtitles for any app, memory) and for the settings
+  that need explaining (live previews, translator memory, Simple mode).
+
+
 ## [0.9.0] - 2026-11-12
 
 ### Added
@@ -103,7 +114,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/ddsaamir/subtle/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ddsaamir/subtle/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ddsaamir/subtle/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ddsaamir/subtle/compare/v0.6.0...v0.7.0

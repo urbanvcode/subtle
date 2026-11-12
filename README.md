@@ -73,7 +73,7 @@ after the speaker stopped:
     <td><img src="docs/images/popup-style.png" alt="Subtitle style options with live preview"></td>
   </tr>
   <tr>
-    <td><b>Models.</b> Recommended models for your graphics card, downloaded with one click.</td>
+    <td><b>Models.</b> Every model with accuracy, speed and memory at a glance; recommended ones for your graphics card download with one click.</td>
     <td><b>Subtitle style.</b> Colours, box, outline and size, with a live preview.</td>
   </tr>
 </table>

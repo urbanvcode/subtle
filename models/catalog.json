@@ -73,7 +73,13 @@
     "best"
    ],
    "note": "The most accurate Whisper, and the one that translates straight to English (Fast engine). Any language.",
-   "license": "apache-2.0"
+   "license": "apache-2.0",
+   "accuracy": 5,
+   "speed": 3,
+   "langs": [
+    "any"
+   ],
+   "tagline": "Most accurate Whisper; translates to English by itself (Fast)."
   },
   {
    "id": "whisper-large-v3-turbo",
@@ -146,7 +152,13 @@
     "best"
    ],
    "note": "Half the memory and faster. Writes down speech for the Best engine; cannot translate by itself. Any language.",
-   "license": "mit"
+   "license": "mit",
+   "accuracy": 4,
+   "speed": 4,
+   "langs": [
+    "any"
+   ],
+   "tagline": "Half the memory, twice as fast. The usual choice for Best."
   },
   {
    "id": "whisper-medium",
@@ -220,7 +232,13 @@
     "best"
    ],
    "note": "For GPUs with 4 GB. Less accurate than large-v3.",
-   "license": "apache-2.0"
+   "license": "apache-2.0",
+   "accuracy": 3,
+   "speed": 4,
+   "langs": [
+    "any"
+   ],
+   "tagline": "For graphics cards with 4 GB."
   },
   {
    "id": "whisper-small",
@@ -294,7 +312,13 @@
     "best"
    ],
    "note": "For very small GPUs or no GPU. Noticeably less accurate.",
-   "license": "apache-2.0"
+   "license": "apache-2.0",
+   "accuracy": 2,
+   "speed": 5,
+   "langs": [
+    "any"
+   ],
+   "tagline": "For very small graphics cards or no graphics card."
   },
   {
    "id": "Qwen3.5-2B-Q4_K_M",
@@ -317,7 +341,13 @@
     "best"
    ],
    "note": "Smallest translator, for 6 GB GPUs. In our test a little less accurate than Qwen3 4B and no faster: choose it for its low memory.",
-   "license": "apache-2.0"
+   "license": "apache-2.0",
+   "accuracy": 2,
+   "speed": 5,
+   "langs": [
+    "any"
+   ],
+   "tagline": "Small and quick, for 6 GB graphics cards."
   },
   {
    "id": "Qwen3-4B-Instruct-2507-Q4_K_M",
@@ -340,7 +370,13 @@
     "best"
    ],
    "note": "Recommended. The best translations among the small translators we measured, for every subtitle language.",
-   "license": "apache-2.0"
+   "license": "apache-2.0",
+   "accuracy": 4,
+   "speed": 4,
+   "langs": [
+    "any"
+   ],
+   "tagline": "The recommended translator: good and fast."
   },
   {
    "id": "Qwen3.5-9B-Q4_K_M",
@@ -363,7 +399,13 @@
     "best"
    ],
    "note": "A bigger translator for 12 GB GPUs. Not part of our benchmark.",
-   "license": "apache-2.0"
+   "license": "apache-2.0",
+   "accuracy": 4,
+   "speed": 3,
+   "langs": [
+    "any"
+   ],
+   "tagline": "More natural lines, for 12 GB graphics cards."
   },
   {
    "id": "gemma-4-12B-it-QAT-Q4_0",
@@ -386,7 +428,13 @@
     "best"
    ],
    "note": "A big translator for 16 GB GPUs and up. Not part of our benchmark.",
-   "license": "apache-2.0"
+   "license": "apache-2.0",
+   "accuracy": 5,
+   "speed": 2,
+   "langs": [
+    "any"
+   ],
+   "tagline": "The best translations, for 16 GB graphics cards."
   },
   {
    "id": "wespeaker-resnet34",
@@ -409,7 +457,11 @@
     "speakers"
    ],
    "note": "Needed only for 'Identify speakers'.",
-   "license": "cc-by-4.0"
+   "license": "cc-by-4.0",
+   "langs": [
+    "any"
+   ],
+   "tagline": "Recognises voices, so each speaker gets a colour."
   },
   {
    "id": "sensevoice-small",
@@ -442,7 +494,14 @@
     "best"
    ],
    "note": "Best for Chinese with the Best engine: 9.3 % wrong characters on test sentences against 11.7 % for Whisper turbo, and about seven times as fast (it reads a whole line in one pass). Used automatically for Chinese. Also knows Cantonese, English, Japanese and Korean, where Whisper and Parakeet did better. Transcribes; can't translate by itself. By FunAudioLLM (Alibaba). Keeps 0.5 GB on disk after its first use.",
-   "license": "FunASR Model License"
+   "license": "FunASR Model License",
+   "accuracy": 5,
+   "speed": 5,
+   "langs": [
+    "zh",
+    "yue"
+   ],
+   "tagline": "Best for Chinese and Cantonese, and very fast."
   },
   {
    "id": "parakeet-tdt_ctc-0.6b-ja",
@@ -466,7 +525,13 @@
    ],
    "note": "Best for Japanese with the Best engine: 6.2 % wrong characters on test sentences against 7.0 % for Whisper turbo, and about six times as fast (it reads a whole line in one pass). Used automatically for Japanese. Japanese only. Transcribes; can't translate by itself. By NVIDIA. Keeps 1.2 GB on disk after its first use.",
    "license": "cc-by-4.0",
-   "language": "ja"
+   "language": "ja",
+   "accuracy": 5,
+   "speed": 5,
+   "langs": [
+    "ja"
+   ],
+   "tagline": "Best for Japanese, and very fast (NVIDIA)."
   },
   {
    "id": "kotoba-whisper-v2.0",
@@ -541,7 +606,13 @@
    "note": "Japanese only. A smaller Whisper trained on Japanese TV speech. On our read-aloud test sentences it was faster than Whisper turbo but less accurate (8.4 % against 7.0 % wrong characters); it may suit TV shows better than that test shows. Transcribes; can't translate by itself.",
    "license": "apache-2.0",
    "language": "ja",
-   "experimental": true
+   "experimental": true,
+   "accuracy": 4,
+   "speed": 5,
+   "langs": [
+    "ja"
+   ],
+   "tagline": "A Whisper trained for Japanese."
   },
   {
    "id": "anime-whisper",
@@ -611,7 +682,13 @@
    "note": "Japanese only. Trained on anime and game voice acting (fast, emotional, shouted or whispered lines). On our read-aloud test sentences it was less accurate than Whisper turbo (10.3 % against 7.0 %); that test is not the kind of speech it was made for. Transcribes; can't translate by itself.",
    "license": "mit",
    "language": "ja",
-   "experimental": true
+   "experimental": true,
+   "accuracy": 3,
+   "speed": 5,
+   "langs": [
+    "ja"
+   ],
+   "tagline": "Japanese anime and game voices: emotional, whispered, shouted."
   },
   {
    "id": "kotoba-whisper-bilingual-v1.0",
@@ -682,7 +759,14 @@
    "note": "Japanese speech straight to English for the Fast engine, in under half the time and memory of Whisper large-v3 and with almost the same quality on our test sentences. Pick it in the popup; it is not used automatically.",
    "license": "apache-2.0",
    "language": "ja",
-   "experimental": true
+   "experimental": true,
+   "accuracy": 4,
+   "speed": 5,
+   "langs": [
+    "ja",
+    "en"
+   ],
+   "tagline": "Japanese and English, and translates between them."
   }
  ]
 }
