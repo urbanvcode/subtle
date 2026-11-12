@@ -7,3 +7,5 @@ pycparser==3.12
 fugashi==1.5.2
 unidic-lite==1.0.8
 pypinyin==0.55.0
+# Subtitles for one program only (Windows process loopback)
+comtypes==1.4.11; sys_platform == "win32"

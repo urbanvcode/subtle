@@ -17,3 +17,4 @@ LICENSE text
 
 # not needed in the download zip (still on GitHub)
 benchmarks/** export-ignore
+*.sh text eol=lf

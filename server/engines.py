@@ -16,6 +16,8 @@ The translator client (llm_translate) lives in llm_client.py and is re-exported 
 
 import gc
 import os
+
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")   # Apple GPU: run the few unsupported ops on the processor
 import threading
 import time
 
@@ -34,6 +36,27 @@ GPU_LOCK = threading.Lock()  # one model call on the GPU at a time
 # ---------------------------------------------------------------------------------------------
 # Model discovery (see modelstore.py: models/ folders + the Hugging Face cache)
 # ---------------------------------------------------------------------------------------------
+def pick_device() -> str:
+    """NVIDIA (or AMD through ROCm) GPU, else the Apple GPU (Experimental), else the processor.
+    SUBTLE_CPU=1 forces the processor; SUBTLE_MPS=0 keeps Macs on the processor."""
+    if os.environ.get("SUBTLE_CPU"):
+        return "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    try:
+        if os.environ.get("SUBTLE_MPS", "1") != "0" and torch.backends.mps.is_available():
+            return "mps"
+    except AttributeError:
+        pass
+    return "cpu"
+
+
+def device_name(device: str) -> str:
+    if device == "cuda":
+        return torch.cuda.get_device_name(0)
+    return "Apple GPU" if device == "mps" else "CPU"
+
+
 def cached_whisper_models() -> list[str]:
     """Ids of the complete speech models in models/whisper and the Hugging Face cache (no downloads)."""
     return whisper_ids()
@@ -176,9 +199,9 @@ class WhisperEngine(Engine):
         t0 = time.time()
         self.model_id = model_id
         # SUBTLE_CPU=1 / SUBTLE_NO_GRAPH=1 force the fallback paths (for testing them).
-        self.device = "cuda" if torch.cuda.is_available() and not os.environ.get("SUBTLE_CPU") else "cpu"
+        self.device = pick_device()
         # fp16 halves memory and is fast on RTX cards; GTX 10-series and older run fp16 very slowly.
-        fast_fp16 = self.device == "cuda" and torch.cuda.get_device_capability(0)[0] >= 7
+        fast_fp16 = self.device == "mps" or (self.device == "cuda" and torch.cuda.get_device_capability(0)[0] >= 7)
         self.dtype = torch.float16 if fast_fp16 else torch.float32
         self.closed = False
         folder = model_source(model_id)
@@ -201,7 +224,7 @@ class WhisperEngine(Engine):
                 self.runner = WhisperRunner(self.W, self.device, self.MAX_CACHE, self.eot, False)
         self.W.t.clear()               # the runner holds the weights it uses (views into the blocks W loaded)
         gc.collect()
-        name = torch.cuda.get_device_name(0) if self.device == "cuda" else "CPU"
+        name = device_name(self.device)
         mode = "CUDA graph" if self.runner.graphs else "eager"
         print(f"[model] {model_id} ready on {name} ({mode}) in {time.time() - t0:.1f}s", flush=True)
 
@@ -249,8 +272,8 @@ class ParakeetEngine(Engine):
     def __init__(self, model_id: str):
         t0 = time.time()
         self.model_id = model_id
-        self.device = "cuda" if torch.cuda.is_available() and not os.environ.get("SUBTLE_CPU") else "cpu"
-        fast_fp16 = self.device == "cuda" and torch.cuda.get_device_capability(0)[0] >= 7
+        self.device = pick_device()
+        fast_fp16 = self.device == "mps" or (self.device == "cuda" and torch.cuda.get_device_capability(0)[0] >= 7)
         self.dtype = torch.float16 if fast_fp16 else torch.float32
         folder = model_source(model_id)
         if not os.path.isdir(folder):
@@ -266,7 +289,7 @@ class ParakeetEngine(Engine):
                 print(f"[model] CUDA graph unavailable for {model_id} ({type(e).__name__}: {e}); running without", flush=True)
                 self.runner = ParakeetRunner(folder, self.device, self.dtype, False)
         gc.collect()
-        name = torch.cuda.get_device_name(0) if self.device == "cuda" else "CPU"
+        name = device_name(self.device)
         mode = "CUDA graph" if self.runner.graph is not None else "eager"
         print(f"[model] {model_id} ready on {name} ({mode}) in {time.time() - t0:.1f}s", flush=True)
 
@@ -281,7 +304,7 @@ class SenseVoiceEngine(Engine):
     def __init__(self, model_id: str):
         t0 = time.time()
         self.model_id = model_id
-        self.device = "cuda" if torch.cuda.is_available() and not os.environ.get("SUBTLE_CPU") else "cpu"
+        self.device = pick_device()
         folder = model_source(model_id)
         if not os.path.isdir(folder):
             raise FileNotFoundError(f"{model_id} is not downloaded (Models page of the Subtle window)")
@@ -296,7 +319,7 @@ class SenseVoiceEngine(Engine):
                 print(f"[model] CUDA graph unavailable for {model_id} ({type(e).__name__}: {e}); running without", flush=True)
                 self.runner = SenseVoiceRunner(folder, self.device, torch.float32, False)
         gc.collect()
-        name = torch.cuda.get_device_name(0) if self.device == "cuda" else "CPU"
+        name = device_name(self.device)
         mode = "CUDA graph" if self.runner.graphs else "eager"
         print(f"[model] {model_id} ready on {name} ({mode}) in {time.time() - t0:.1f}s", flush=True)
 

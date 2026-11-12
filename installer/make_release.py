@@ -6,6 +6,8 @@ Build the downloads of a release from the current commit:
                                           server only (the installer skips the extra packages; the app hides
                                           the extra features)
   Subtle-Firefox-extension-<version>.zip  the extension for Firefox (Experimental), files at the top level
+  Subtle-Setup-<version>.exe              Windows only: asks for a folder, unpacks the full zip, runs the installer
+                                          (a self-extracting package made with Windows' own IExpress)
 
 Both Subtle zips also carry the Firefox extension as extension-firefox/.
 
@@ -71,6 +73,42 @@ def build_firefox_folder(dst: Path):
     print(f"Firefox extension in {dst}")
 
 
+def build_setup_exe(full_zip: Path, out: Path):
+    """Subtle-Setup-<v>.exe: IExpress unpacks payload.zip + setup.ps1 to a temp folder and runs setup.cmd."""
+    import os
+    import shutil
+    import tempfile
+    iexpress = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "iexpress.exe"
+    if sys.platform != "win32" or not iexpress.is_file():
+        print("(no IExpress here: Setup.exe skipped)")
+        return
+    work = Path(tempfile.mkdtemp(prefix="subtle-sfx-"))
+    shutil.copy(full_zip, work / "payload.zip")
+    shutil.copy(ROOT / "installer" / "setup.ps1", work / "setup.ps1")
+    crlf = "\r\n"
+    (work / "setup.cmd").write_text(
+        "@echo off" + crlf + 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup.ps1"' + crlf,
+        encoding="ascii", newline="")
+    target = out / f"Subtle-Setup-{VERSION}.exe"
+    files = ["payload.zip", "setup.ps1", "setup.cmd"]
+    sed = crlf.join([
+        "[Version]", "Class=IEXPRESS", "SEDVersion=3", "[Options]", "PackagePurpose=InstallApp", "ShowInstallProgramWindow=1",
+        "HideExtractAnimation=0", "UseLongFileName=1", "InsideCompressed=0", "CAB_FixedSize=0", "CAB_ResvCodeSigning=0",
+        "RebootMode=N", "InstallPrompt=%InstallPrompt%", "DisplayLicense=%DisplayLicense%", "FinishMessage=%FinishMessage%",
+        "TargetName=%TargetName%", "FriendlyName=%FriendlyName%", "AppLaunched=%AppLaunched%", "PostInstallCmd=%PostInstallCmd%",
+        "AdminQuietInstCmd=%AdminQuietInstCmd%", "UserQuietInstCmd=%UserQuietInstCmd%", "SourceFiles=SourceFiles",
+        "[Strings]", "InstallPrompt=", "DisplayLicense=", "FinishMessage=", f"TargetName={target}",
+        f"FriendlyName=Subtle {VERSION} setup", "AppLaunched=cmd /c setup.cmd", "PostInstallCmd=<None>",
+        "AdminQuietInstCmd=", "UserQuietInstCmd="]
+        + [f"FILE{i}=\"{f}\"" for i, f in enumerate(files)]
+        + ["[SourceFiles]", f"SourceFiles0={work}\\", "[SourceFiles0]"] + [f"%FILE{i}%=" for i in range(len(files))]) + crlf
+    (work / "subtle.sed").write_text(sed, encoding="ascii", newline="")
+    subprocess.run([str(iexpress), "/N", "/Q", str(work / "subtle.sed")], check=True)
+    shutil.rmtree(work, ignore_errors=True)
+    if not target.is_file():
+        print("(IExpress made no Setup.exe)")
+
+
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "--firefox":
         return build_firefox_folder(Path(sys.argv[2]).resolve())
@@ -102,7 +140,11 @@ def main():
                 if lite:
                     dst.writestr("Subtle/edition.txt", "lite\n")
     base.unlink()
-    for z in sorted(out.glob(f"*{VERSION}.zip")):
+    build_setup_exe(out / f"Subtle-{VERSION}.zip", out)
+    for z in sorted(list(out.glob(f"*{VERSION}.zip")) + list(out.glob(f"*{VERSION}.exe"))):
+        if z.suffix == ".exe":
+            print(f"{z.name}: {z.stat().st_size // 1024} KB")
+            continue
         with zipfile.ZipFile(z) as f:
             print(f"{z.name}: {len(f.namelist())} files, {z.stat().st_size // 1024} KB")
 

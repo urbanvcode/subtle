@@ -1,4 +1,4 @@
-"""Small Windows helpers for the supervisor (no-ops elsewhere)."""
+"""Small operating-system helpers for the supervisor: Windows first, with Linux and macOS versions."""
 
 import ctypes
 import os
@@ -61,6 +61,23 @@ class ChildJob:
             pass
 
 
+def _die_with_parent():
+    """Linux: the child gets SIGTERM when Subtle exits, even on a crash (like the Windows job object)."""
+    try:
+        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, 15)     # PR_SET_PDEATHSIG, SIGTERM
+    except Exception:
+        pass
+
+
+def popen_kwargs() -> dict:
+    """Extra subprocess.Popen arguments for a background child (engine, translator)."""
+    if sys.platform == "win32":
+        return {"creationflags": NO_WINDOW}
+    if sys.platform.startswith("linux"):
+        return {"preexec_fn": _die_with_parent}
+    return {}
+
+
 def process_tree(pid: int | None) -> list[int]:
     """pid and all its descendants. (A venv's python.exe on Windows is a launcher that runs the real
     interpreter as a child, so the memory and the work are in the child.)"""
@@ -119,10 +136,49 @@ def windowless_python() -> str:
 
 
 def startup_shortcut() -> Path:
-    return Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Subtle.lnk"
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Subtle.lnk"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "LaunchAgents" / "io.github.ddsaamir.subtle.plist"
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "autostart" / "subtle.desktop"
 
 
 def make_shortcut(link: Path, target: str, args: str, workdir: str, icon: str = "") -> bool:
+    if sys.platform != "win32":
+        return _make_launcher(link, target, args, workdir, icon)
+    return _make_lnk(link, target, args, workdir, icon)
+
+
+def _make_launcher(link: Path, target: str, args: str, workdir: str, icon: str = "") -> bool:
+    """Linux: a .desktop file; macOS: a LaunchAgent (both start Subtle when you log in)."""
+    import shlex
+    from xml.sax.saxutils import escape
+    try:
+        link.parent.mkdir(parents=True, exist_ok=True)
+        argv = [target] + shlex.split(args)
+        if link.suffix == ".plist":
+            items = "".join(f"<string>{escape(a)}</string>" for a in argv)
+            text = "\n".join([
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+                '<plist version="1.0"><dict>',
+                "<key>Label</key><string>io.github.ddsaamir.subtle</string>",
+                f"<key>ProgramArguments</key><array>{items}</array>",
+                f"<key>WorkingDirectory</key><string>{escape(workdir)}</string>",
+                "<key>RunAtLoad</key><true/>",
+                "</dict></plist>", ""])
+        else:
+            text = "\n".join([
+                "[Desktop Entry]", "Type=Application", "Name=Subtle", "Comment=Real-time subtitles",
+                "Exec=" + " ".join(shlex.quote(a) for a in argv), f"Path={workdir}"]
+                + ([f"Icon={icon}"] if icon else []) + ["Terminal=false", "X-GNOME-Autostart-enabled=true", ""])
+        link.write_text(text, encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def _make_lnk(link: Path, target: str, args: str, workdir: str, icon: str = "") -> bool:
     """Create a .lnk with Windows' own shell object (via PowerShell, no extra packages)."""
     def q(s: str) -> str:
         return s.replace("'", "''")
@@ -141,7 +197,11 @@ def make_shortcut(link: Path, target: str, args: str, workdir: str, icon: str = 
 def open_path(path) -> bool:
     try:
         Path(path).mkdir(parents=True, exist_ok=True) if not Path(path).suffix else None
-        os.startfile(str(path))          # Explorer / default app; local only
+        if sys.platform == "win32":
+            os.startfile(str(path))      # Explorer / default app; local only
+        else:
+            subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(path)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except (OSError, AttributeError):
         return False

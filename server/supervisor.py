@@ -143,7 +143,7 @@ class Engine:
             try:
                 self.proc = subprocess.Popen(cmd, cwd=str(SERVER_DIR), env=env, stdin=subprocess.DEVNULL,
                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                             creationflags=winutil.NO_WINDOW)
+                                             **winutil.popen_kwargs())
             except OSError as e:
                 self.state, self.error = "error", f"could not start the engine: {e}"
                 return self.error
@@ -808,7 +808,8 @@ class Supervisor:
             err = await self.pc.start(self.pc_config(), str(self.settings.get("pc_device") or ""))
             return {"error": err} if err else {"ok": True}
         if cmd == "pc_devices":
-            return {"devices": await asyncio.to_thread(pcaudio.output_devices)}
+            return {"devices": await asyncio.to_thread(pcaudio.output_devices),
+                    "programs": await asyncio.to_thread(pcaudio.programs)}
         if cmd == "reset_delay":
             self.delays.clear()
             await self.push_state()

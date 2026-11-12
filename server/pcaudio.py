@@ -40,6 +40,45 @@ def _soundcard():
     return sc
 
 
+def programs() -> list[dict]:
+    """Programs that can be listened to on their own (Windows 10 2004+): [{"id": "app:discord.exe", "name"}]."""
+    try:
+        import procloop
+        if not procloop.supported():
+            return []
+        import psutil
+        out = []
+        for d in procloop.audio_programs():
+            try:
+                exe = psutil.Process(d["pid"]).name()
+            except Exception:
+                continue
+            out.append({"id": "app:" + exe.lower(), "name": d["name"]})
+        return out
+    except Exception:
+        return []
+
+
+def _program_pid(exe: str) -> int | None:
+    """The top process of a running program with that file name (its children are recorded too)."""
+    import procloop
+    for d in procloop.audio_programs():
+        try:
+            import psutil
+            if psutil.Process(d["pid"]).name().lower() == exe:
+                return d["pid"]
+        except Exception:
+            continue
+    try:
+        import psutil
+        for proc in psutil.process_iter(["name", "pid"]):
+            if (proc.info["name"] or "").lower() == exe:
+                return proc.info["pid"]
+    except Exception:
+        pass
+    return None
+
+
 def output_devices() -> list[dict]:
     """Speakers / headphones that can be listened to, default first."""
     try:
@@ -128,14 +167,26 @@ class PcAudio:
     async def start(self, config: dict, device: str = "") -> str:
         await self.stop()
         try:
-            sc = _soundcard()
-            spk = sc.default_speaker() if not device else next(
-                (s for s in sc.all_speakers() if str(s.name) == device), sc.default_speaker())
-            mic = sc.get_microphone(id=str(spk.name), include_loopback=True)
+            if device.startswith("app:"):                    # one program only
+                import procloop
+                exe = device[4:]
+                pid = _program_pid(exe)
+                if pid is None:
+                    self.error = f"{exe} isn't running. Start it (and let it play something), then press Start."
+                    return self.error
+                open_rec = lambda: procloop.ProcessRecorder(pid)       # noqa: E731
+                label = f"{exe.rsplit('.', 1)[0]} only"
+            else:
+                sc = _soundcard()
+                spk = sc.default_speaker() if not device else next(
+                    (s for s in sc.all_speakers() if str(s.name) == device), sc.default_speaker())
+                mic = sc.get_microphone(id=str(spk.name), include_loopback=True)
+                open_rec = lambda: mic.recorder(samplerate=SR, channels=1, blocksize=BLOCK)   # noqa: E731
+                label = spk.name
         except Exception as e:
             self.error = f"Can't listen to the PC's sound: {type(e).__name__}: {e}"
             return self.error
-        self.error, self.device = "", spk.name
+        self.error, self.device = "", label
         self.config = {"type": "config", **config}
         loop = asyncio.get_running_loop()
         self.sock = QueueSocket(self.on_message)
@@ -145,9 +196,9 @@ class PcAudio:
         self.running = True
         self.sock.put(json.dumps(self.config))
         self.task = asyncio.create_task(self._run_tab())
-        self.thread = threading.Thread(target=self._record, args=(mic, loop, self.sock), daemon=True)
+        self.thread = threading.Thread(target=self._record, args=(open_rec, loop, self.sock), daemon=True)
         self.thread.start()
-        self.log(f"[pc] listening to {spk.name}: {config.get('language')} -> {config.get('target')} ({config.get('mode')})")
+        self.log(f"[pc] listening to {label}: {config.get('language')} -> {config.get('target')} ({config.get('mode')})")
         await self.sup.push_state()
         return ""
 
@@ -159,9 +210,9 @@ class PcAudio:
         finally:
             self.sup.tabs.discard(self.tab)
 
-    def _record(self, mic, loop, sock: QueueSocket):
+    def _record(self, open_rec, loop, sock: QueueSocket):
         try:
-            with mic.recorder(samplerate=SR, channels=1, blocksize=BLOCK) as rec:
+            with open_rec() as rec:
                 while self.running and sock is self.sock:
                     data = rec.record(numframes=BLOCK)
                     if data.ndim > 1:

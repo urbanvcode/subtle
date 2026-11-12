@@ -77,11 +77,18 @@ ASR_DEFAULT_ROWS = (
 
 
 def windows_dark() -> bool:
+    """Is the system in dark mode? (Windows: its own setting; Linux / macOS: what Qt reports.)"""
+    if sys.platform != "win32":
+        try:
+            from PySide6.QtGui import QGuiApplication
+            return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
+        except Exception:
+            return False
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
             return winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
-    except OSError:
+    except (OSError, ImportError):
         return False
 
 
@@ -768,7 +775,8 @@ class ControlPanel:
         self.pc_target = self.combo(PC_TARGETS, lambda v: self.pc_save(pc_target=v))
         self.pc_mode = self.combo([("whisper", "Fast (to English)"), ("llm", "Best (any language)")],
                                   lambda v: self.pc_save(pc_mode=v))
-        self.pc_dev = self.combo([("", "Default speakers")], lambda v: self.pc_save(pc_device=v))
+        self.pc_dev = self.combo([("", "Everything (default speakers)")],
+                                 lambda v: self.pc_load_sources() if v == "__refresh__" else self.pc_save(pc_device=v))
         for col, (title, w) in enumerate((("Spoken", self.pc_lang), ("Subtitles in", self.pc_target),
                                           ("Engine", self.pc_mode), ("Listen to", self.pc_dev))):
             grid.addWidget(self.label(title, "small"), 0, col)
@@ -934,6 +942,20 @@ class ControlPanel:
             self.pc_apply_style()
         self.overlay.on_message(msg)
 
+    def pc_load_sources(self):
+        """"Listen to": everything on a speaker, or one program only (Windows 10 2004+)."""
+        def got(r):
+            s = self.st.get("settings", {})
+            devs = r.get("devices") or []
+            progs = r.get("programs") or []
+            choices = [("", "Everything (default speakers)")] +                       [(d["id"], f"Everything on {d['name']}") for d in devs if not d.get("default")] +                       [(p["id"], f"Only {p['name']}") for p in progs]
+            want = s.get("pc_device", "")
+            if want and want.startswith("app:") and not any(v == want for v, _ in choices):
+                choices.append((want, f"Only {want[4:].rsplit('.', 1)[0]} (not playing now)"))
+            choices.append(("__refresh__", "Refresh this list…"))
+            self.fill_combo(self.pc_dev, choices, want)
+        self.cmd("pc_devices", got)
+
     def render_pc(self):
         st = self.st
         s, pc = st.get("settings", {}), st.get("pc") or {}
@@ -954,11 +976,7 @@ class ControlPanel:
                         s.get("pc_screen", 0))
         if not self._pc_devices_loaded:
             self._pc_devices_loaded = True
-            def got(r):
-                devs = r.get("devices") or []
-                choices = [("", "Default speakers")] + [(d["id"], d["name"]) for d in devs if not d.get("default")]
-                self.fill_combo(self.pc_dev, choices, s.get("pc_device", ""))
-            self.cmd("pc_devices", got)
+            self.pc_load_sources()
         else:
             self.set_combo(self.pc_dev, s.get("pc_device", ""))
         running = pc.get("running")

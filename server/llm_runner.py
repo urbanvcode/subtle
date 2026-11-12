@@ -17,6 +17,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import winutil
+
 ROOT = Path(__file__).resolve().parent.parent
 LLAMA_DIR = ROOT / "bin" / "llama"
 NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0     # CREATE_NO_WINDOW
@@ -119,7 +121,7 @@ class LlamaServer:
             try:
                 self.proc = subprocess.Popen(
                     self.command(path, cfg), cwd=str(LLAMA_DIR), stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=NO_WINDOW,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **winutil.popen_kwargs(),
                 )
             except OSError as e:
                 self.state, self.error = "error", f"could not start llama-server: {e}"
