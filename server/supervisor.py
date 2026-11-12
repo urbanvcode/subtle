@@ -39,10 +39,12 @@ from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Response
 
 import downloads
+import edition
 import gpuinfo
 import llm_client
 import llm_runner
 import modelstore
+import pcaudio
 import settings as settings_mod
 import winutil
 from version import VERSION
@@ -262,6 +264,25 @@ class Tab:
         finally:
             self.summarizing = False
 
+    async def define(self, word: str, context: str, surface: str = "", reading: str = ""):
+        if not word.strip():
+            return
+        cfg = self.config or {}
+        try:
+            url, model_id, err = await self.sup.ensure_llm(str(cfg.get("llm_model") or ""))
+            if err or not url:
+                await self.send({"type": "define", "word": word, "error": err or "No translator model."})
+                return
+            self.sup.last_llm_use = time.monotonic()
+            lang = str(cfg.get("language") or "")
+            text = await asyncio.to_thread(llm_client.llm_define, url, model_id, word, context,
+                                           None if lang in ("", "auto") else lang, str(cfg.get("target") or "en"),
+                                           surface, reading)
+            await self.send({"type": "define", "word": word, "text": text})
+        except Exception as e:
+            log(f"[define] {type(e).__name__}: {e}")
+            await self.send({"type": "define", "word": word, "error": f"Could not look it up ({type(e).__name__})."})
+
     async def send(self, obj):
         async with self.send_lock:
             try:
@@ -302,6 +323,10 @@ class Tab:
                 elif kind == "info":
                     self.sup.prewarm()          # the popup is open: Start is probably next
                     await self.send(await self.sup.info())
+                elif kind == "define":          # learning mode: a word was clicked
+                    self.define_task = asyncio.create_task(self.define(
+                        str(msg.get("word") or "")[:60], str(msg.get("context") or "")[:400],
+                        str(msg.get("surface") or "")[:60], str(msg.get("reading") or "")[:80]))
                 elif kind == "summary":         # "Catch me up"
                     self.summary_task = asyncio.create_task(self.summarize(float(msg.get("minutes") or 5)))
                 elif kind == "config":
@@ -446,6 +471,8 @@ class Supervisor:
         self.stop_event: asyncio.Event | None = None
         self.downloader = downloads.Downloader(on_change=self._downloads_changed)
         self.update_info: dict | None = None      # {"version", "url"} when GitHub has a newer Subtle
+        self.pc = pcaudio.PcAudio(self, self._pc_message, log, Tab)   # subtitles for the PC's own sound
+        self.pc_status = ""
         self.hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
         self.origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
 
@@ -492,6 +519,24 @@ class Supervisor:
                 log(f"[idle] translator unused for {minutes} min - stopping it")
                 await self.llama.stop()
 
+    def simple(self) -> bool:
+        """Simple mode: only what the browser extension needs (always so in Subtle Lite)."""
+        return edition.LITE or bool(self.settings.get("simple_mode"))
+
+    # -- subtitles for the PC's own sound ----------------------------------------------------------
+    def _pc_message(self, msg: dict):
+        kind = msg.get("type")
+        if kind == "status":
+            self.pc_status = str(msg.get("message") or "")
+        if self.ui is not None and hasattr(self.ui, "pc_message"):
+            self.ui.post(self.ui.pc_message, msg)
+
+    def pc_config(self) -> dict:
+        s = self.settings
+        return {"language": s.get("pc_language", "ja"), "target": s.get("pc_target", "en"),
+                "mode": s.get("pc_mode", "whisper"), "asr_model": "auto", "llm_model": "",
+                "page_title": "PC sound"}
+
     # -- update notice ---------------------------------------------------------------------------
     RELEASES_URL = "https://api.github.com/repos/ddsaamir/subtle/releases/latest"
 
@@ -512,6 +557,7 @@ class Supervisor:
             await asyncio.sleep(24 * 3600)
 
     async def unload(self):
+        await self.pc.stop()                      # it would only load everything again
         for tab in list(self.tabs):
             link, tab.link = tab.link, None
             if link is not None:
@@ -589,7 +635,8 @@ class Supervisor:
                 "llm_default": self.pick_llm("")[0] if s.get("llm_backend") != "external" else s.get("llm_model", ""),
                 "gpu": gpu.get("name", "CPU"), "backend": s.get("llm_backend"),
                 "panel_url": f"http://127.0.0.1:{self.port}/",
-                "update": self.update_info if s.get("check_updates", True) else None}
+                "update": self.update_info if s.get("check_updates", True) else None,
+                "simple": self.simple(), "lite": edition.LITE}
 
     async def gpu_info(self) -> dict:
         if time.monotonic() - self.gpu_at > 4.0:      # nvidia-smi is a process start: not every refresh
@@ -642,6 +689,8 @@ class Supervisor:
               "usage": await self.usage_cached(), "engine": self.engine.snapshot(),
               "translator": self.llama.snapshot(), "tabs": len(self.tabs), "downloads": self.downloader.status(),
               "idle_for": round(time.monotonic() - self.last_audio) if self.last_audio else None,
+              "pc": dict(self.pc.snapshot(), status=self.pc_status),
+              "simple": self.simple(), "lite": edition.LITE,
               "delay": self.delay_stats(), "update": self.update_info if self.settings.get("check_updates", True) else None}
         if full:
             st["models"] = await asyncio.to_thread(self.models)
@@ -746,6 +795,20 @@ class Supervisor:
             except Exception as e:
                 return {"error": f"{type(e).__name__}: {e}"}
             return {"text": out, "ms": int((time.perf_counter() - t0) * 1000), "model": model_id}
+        if cmd in ("pc_start", "pc_stop", "pc_update"):
+            if cmd == "pc_stop":
+                await self.pc.stop()
+                return {"ok": True}
+            if cmd == "pc_update":
+                await self.pc.update(self.pc_config())
+                return {"ok": True}
+            if edition.LITE:
+                return {"error": "Subtitles for any app are in the full version of Subtle, not in Subtle Lite."}
+            self.pc_status = ""
+            err = await self.pc.start(self.pc_config(), str(self.settings.get("pc_device") or ""))
+            return {"error": err} if err else {"ok": True}
+        if cmd == "pc_devices":
+            return {"devices": await asyncio.to_thread(pcaudio.output_devices)}
         if cmd == "reset_delay":
             self.delays.clear()
             await self.push_state()

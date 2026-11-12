@@ -1,0 +1,9 @@
+# Packages for the extra features of the full version (Subtle Lite skips these, about 260 MB).
+# Subtitles for any app: records what the speakers play (WASAPI loopback / PulseAudio monitor)
+soundcard==0.4.5
+cffi==2.1.1
+pycparser==3.12
+# Learning mode: word readings (furigana / romaji with fugashi + unidic-lite, pinyin with pypinyin)
+fugashi==1.5.2
+unidic-lite==1.0.8
+pypinyin==0.55.0

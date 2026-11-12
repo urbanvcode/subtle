@@ -28,9 +28,19 @@ DEFAULTS = {
     "asr_default_ja": "auto",
     "asr_default_ko": "auto",
     "asr_default_other": "auto",
+    # Subtitles for the PC's own sound (Discord, games, VLC...): shown in a window on top of the desktop
+    "pc_language": "ja",
+    "pc_target": "en",
+    "pc_mode": "whisper",                # "whisper" (Fast) | "llm" (Best)
+    "pc_device": "",                     # speakers to listen to; "" = the Windows default
+    "pc_size": 100,                      # text size, %
+    "pc_height": 8,                      # % of the screen height above the bottom
+    "pc_opacity": 62,                    # box behind the text, %
+    "pc_screen": 0,                      # which monitor (0 = main)
     # App
     "open_panel_on_start": True,
     "check_updates": True,               # once a day: ask GitHub for the newest Subtle version (nothing else is sent)
+    "simple_mode": False,                # hide the extra features (always on in Subtle Lite)
     "first_run_done": False,
     "scan_lmstudio": True,               # also list .gguf models already downloaded with LM Studio
     "extra_llm_dirs": [],

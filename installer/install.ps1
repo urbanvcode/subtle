@@ -162,6 +162,13 @@ $torchPins = Get-Content $req | Where-Object { $_ -match "^(torch|torchaudio)=="
 if ($LASTEXITCODE -ne 0) { Fail "Could not install PyTorch from $index." }
 & $uv pip install --python $py -r $req
 if ($LASTEXITCODE -ne 0) { Fail "Could not install the Python packages." }
+# Subtle Lite (edition.txt says "lite") is the extension's server only: no packages for the extra features.
+$edition = Join-Path $Root "edition.txt"
+$lite = (Test-Path $edition) -and ((Get-Content $edition -Raw).Trim() -eq "lite")
+if (-not $lite) {
+    & $uv pip install --python $py -r (Join-Path $PSScriptRoot "requirements-extras.txt")
+    if ($LASTEXITCODE -ne 0) { Say "  Warning: the packages for the extra features did not install (subtitles for any app, learning mode). Everything else works." "Yellow" }
+}
 & $uv cache clean *> $null          # the downloaded wheels are no longer needed (~3 GB)
 
 Step "Checking the installation"

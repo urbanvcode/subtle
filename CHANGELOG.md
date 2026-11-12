@@ -5,6 +5,20 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-12
+
+### Added
+- **Subtitles for any app**: Discord, Zoom, games, VLC, a film on your PC. Start it on the Home page of the
+  Subtle window; Subtle listens to what your speakers play and shows subtitles at the bottom of the screen,
+  on top of every window, with clicks passing through. Text size, position, box and screen can be set.
+- **Learning mode** (popup → Display): the original line with readings over each word: furigana or romaji
+  for Japanese, pinyin for Chinese, romanization for Korean. Click a word to see what it means in that
+  sentence; the video pauses until you close the card.
+- **Subtle Lite**, a second download: only the server for the browser extension, without the extra
+  features and their packages (about 260 MB smaller). The full version has a matching **Simple mode**
+  switch in Settings that hides the extras.
+
+
 ## [0.6.0] - 2026-11-12
 
 ### Added
@@ -56,6 +70,7 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ddsaamir/subtle/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ddsaamir/subtle/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ddsaamir/subtle/releases/tag/v0.5.0

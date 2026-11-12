@@ -26,6 +26,15 @@ from PySide6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QFrame,
 
 import modelstore
 
+PC_SPOKEN = [("ja", "Japanese"), ("zh", "Chinese"), ("ko", "Korean"), ("en", "English"), ("es", "Spanish"),
+             ("fr", "French"), ("de", "German"), ("it", "Italian"), ("pt", "Portuguese"), ("ru", "Russian"),
+             ("th", "Thai"), ("vi", "Vietnamese"), ("id", "Indonesian"), ("hi", "Hindi"), ("ar", "Arabic"),
+             ("tr", "Turkish"), ("ur", "Urdu"), ("auto", "Auto-detect")]
+PC_TARGETS = [("en", "English"), ("ja", "Japanese"), ("zh", "Chinese"), ("ko", "Korean"), ("es", "Spanish"),
+              ("fr", "French"), ("de", "German"), ("it", "Italian"), ("pt", "Portuguese"), ("ru", "Russian"),
+              ("ar", "Arabic"), ("hi", "Hindi"), ("ur", "Urdu"), ("id", "Indonesian"), ("vi", "Vietnamese"),
+              ("th", "Thai"), ("tr", "Turkish"), ("nl", "Dutch"), ("pl", "Polish")]
+
 ASSETS = Path(__file__).resolve().parent / "assets"
 
 PALETTES = {
@@ -742,6 +751,47 @@ class ControlPanel:
         hl.addWidget(self.hero_sub)
         lay.addWidget(hero)
 
+        # subtitles for the PC's own sound (any app)
+        pc, pl = self.card((24, 18, 24, 18))
+        ph = QHBoxLayout()
+        ph.addWidget(self.label("Subtitles for any app", "h2"))
+        ph.addStretch(1)
+        self.pc_btn = self.button("Start", self.pc_toggle, "primary")
+        ph.addWidget(self.pc_btn)
+        pl.addLayout(ph)
+        pl.addWidget(self.label("Discord, Zoom, games, VLC, a film on your PC: Subtle listens to what your speakers "
+                                "play and shows subtitles at the bottom of your screen.", "small", wrap=True))
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(4)
+        self.pc_lang = self.combo(PC_SPOKEN, lambda v: self.pc_save(pc_language=v))
+        self.pc_target = self.combo(PC_TARGETS, lambda v: self.pc_save(pc_target=v))
+        self.pc_mode = self.combo([("whisper", "Fast (to English)"), ("llm", "Best (any language)")],
+                                  lambda v: self.pc_save(pc_mode=v))
+        self.pc_dev = self.combo([("", "Default speakers")], lambda v: self.pc_save(pc_device=v))
+        for col, (title, w) in enumerate((("Spoken", self.pc_lang), ("Subtitles in", self.pc_target),
+                                          ("Engine", self.pc_mode), ("Listen to", self.pc_dev))):
+            grid.addWidget(self.label(title, "small"), 0, col)
+            grid.addWidget(w, 1, col)
+            grid.setColumnStretch(col, 1)
+        self.pc_size = self.combo([(v, f"{v}%") for v in (70, 85, 100, 125, 150, 200)],
+                                  lambda v: self.pc_save(False, pc_size=v))
+        self.pc_height = self.combo([(v, f"{v}% up") for v in (2, 5, 8, 12, 20, 30, 45)],
+                                    lambda v: self.pc_save(False, pc_height=v))
+        self.pc_opacity = self.combo([(v, f"{v}%") for v in (0, 30, 45, 62, 80, 100)],
+                                     lambda v: self.pc_save(False, pc_opacity=v))
+        self.pc_screen = self.combo([(0, "Main screen")], lambda v: self.pc_save(False, pc_screen=v))
+        for col, (title, w) in enumerate((("Text size", self.pc_size), ("Position", self.pc_height),
+                                          ("Box", self.pc_opacity), ("Screen", self.pc_screen))):
+            grid.addWidget(self.label(title, "small"), 2, col)
+            grid.addWidget(w, 3, col)
+        pl.addLayout(grid)
+        self.pc_state = self.label("", "small", wrap=True)
+        pl.addWidget(self.pc_state)
+        lay.addWidget(pc)
+        self.overlay = None
+        self._pc_devices_loaded = False
+
         # subtitle delay
         dc, dl = self.card((24, 18, 24, 18))
         dh = QHBoxLayout()
@@ -849,8 +899,86 @@ class ControlPanel:
         self.notice.hide()
         lay.addWidget(self.notice)
 
+    # ---------------------------------------------------------------- PC sound
+    def pc_toggle(self):
+        running = (self.st.get("pc") or {}).get("running")
+        self.pc_btn.setEnabled(False)
+        def done(r):
+            self.pc_btn.setEnabled(True)
+            self.refresh()
+        self.cmd("pc_stop" if running else "pc_start", done)
+
+    def pc_save(self, restart=True, **changes):
+        running = (self.st.get("pc") or {}).get("running")
+        if not restart:                           # only the look: apply it right away
+            self.st.setdefault("settings", {}).update(changes)
+            self.pc_apply_style()
+        def after(r):
+            if restart and running:
+                if "pc_device" in changes:
+                    self.cmd("pc_start", lambda r: self.refresh())
+                else:
+                    self.cmd("pc_update", lambda r: self.refresh())
+            self.refresh(True)
+        self.cmd("settings", after, changes=changes)
+
+    def pc_apply_style(self):
+        s = self.st.get("settings", {})
+        if self.overlay is None:
+            from overlay_qt import SubtitleOverlay
+            self.overlay = SubtitleOverlay()
+        self.overlay.apply_style(s.get("pc_size", 100), s.get("pc_height", 8), s.get("pc_opacity", 62), s.get("pc_screen", 0))
+
+    def pc_message(self, msg):
+        if self.overlay is None:
+            self.pc_apply_style()
+        self.overlay.on_message(msg)
+
+    def render_pc(self):
+        st = self.st
+        s, pc = st.get("settings", {}), st.get("pc") or {}
+        card = self.pc_btn.parentWidget()
+        hide = bool(st.get("simple")) and not pc.get("running")
+        if card is not None and card.isHidden() != hide:
+            card.setVisible(not hide)
+        if hide:
+            return
+        self.set_combo(self.pc_lang, s.get("pc_language", "ja"))
+        self.set_combo(self.pc_target, s.get("pc_target", "en"))
+        self.set_combo(self.pc_mode, s.get("pc_mode", "whisper"))
+        self.set_combo(self.pc_size, s.get("pc_size", 100))
+        self.set_combo(self.pc_height, s.get("pc_height", 8))
+        self.set_combo(self.pc_opacity, s.get("pc_opacity", 62))
+        screens = QApplication.screens()
+        self.fill_combo(self.pc_screen, [(i, "Main screen" if i == 0 else f"Screen {i + 1}") for i in range(len(screens))],
+                        s.get("pc_screen", 0))
+        if not self._pc_devices_loaded:
+            self._pc_devices_loaded = True
+            def got(r):
+                devs = r.get("devices") or []
+                choices = [("", "Default speakers")] + [(d["id"], d["name"]) for d in devs if not d.get("default")]
+                self.fill_combo(self.pc_dev, choices, s.get("pc_device", ""))
+            self.cmd("pc_devices", got)
+        else:
+            self.set_combo(self.pc_dev, s.get("pc_device", ""))
+        running = pc.get("running")
+        self.set_text(self.pc_btn, "Stop" if running else "Start")
+        kind = "secondary" if running else "primary"
+        if self.pc_btn.property("kind") != kind:
+            self.pc_btn.setProperty("kind", kind)
+            self.pc_btn.style().unpolish(self.pc_btn)
+            self.pc_btn.style().polish(self.pc_btn)
+        if pc.get("error"):
+            text = pc["error"]
+        elif running:
+            text = f"Listening to {pc.get('device') or 'your speakers'}." +                    (f"  {pc['status']}" if pc.get("status") and pc.get("status") != "Ready" else "") +                    "  Games in exclusive fullscreen hide the subtitles: use borderless or windowed mode."
+        else:
+            text = "Off. Nothing is recorded; when on, the sound only goes to the speech engine on this PC."
+        self.set_text(self.pc_state, text)
+
     def render_home(self):
         st, c = self.st, self.c
+        self.render_pc()
         s, e, t = st.get("settings", {}), st.get("engine", {}), st.get("translator", {})
         ext = s.get("llm_backend") == "external"
         tabs = st.get("tabs", 0)
@@ -864,7 +992,11 @@ class ControlPanel:
         elif es == "starting" or ts == "starting":
             tone, title, sub = "busy", "Loading models…", "This takes a few seconds; subtitles start right after."
         elif tabs:
-            tone, title = "ok", f"Subtitling {tabs} tab{'s' if tabs != 1 else ''}"
+            pc_on = bool((st.get("pc") or {}).get("running"))
+            browser_tabs = tabs - (1 if pc_on else 0)
+            what = [f"{browser_tabs} tab{'s' if browser_tabs != 1 else ''}"] if browser_tabs else []
+            what += ["your PC's sound"] if pc_on else []
+            tone, title = "ok", "Subtitling " + " and ".join(what)
             sub = f"Using {', '.join(loaded) or 'the speech engine'}" + \
                   (f" and the translator {t.get('model')}" if ts == "ready" else "") + "."
         else:
@@ -938,7 +1070,7 @@ class ControlPanel:
         s, e, t = st.get("settings", {}), st.get("engine", {}), st.get("translator", {})
         ext = s.get("llm_backend") == "external"
         es, ts = e.get("state"), t.get("state")
-        self.set_text(self.ver, "version " + st.get("version", ""))
+        self.set_text(self.ver, "version " + st.get("version", "") + (" Lite" if st.get("lite") else ""))
         self._side("app", "ok", "running")
         self._side("engine", {"ready": "ok", "starting": "busy", "error": "bad"}.get(es, "off"),
                    {"ready": "running", "starting": "loading", "error": "problem"}.get(es, "idle"))
@@ -1407,6 +1539,9 @@ class ControlPanel:
         self.setting_row(al, "Show this window when Subtle starts", "Otherwise it starts quietly in the tray.", self.open_start)
         self.scan_lms = Toggle(c, lambda v: self.save(scan_lmstudio=v))
         self.setting_row(al, "Use LM Studio's models", "Translator models you downloaded with LM Studio are used without copying.", self.scan_lms)
+        self.simple_t = Toggle(c, lambda v: self.save(simple_mode=v))
+        self.simple_row = self.setting_row(al, "Simple mode", "Only what the browser extension needs: hides subtitles for "
+                                           "any app, learning mode, Catch me up and Save subtitles.", self.simple_t)
         self.check_upd = Toggle(c, lambda v: self.save(check_updates=v))
         self.setting_row(al, "Tell me about new versions", "Once a day Subtle asks GitHub for the newest version number. Nothing else is sent.", self.check_upd)
         lay.addWidget(ac)
@@ -1450,6 +1585,8 @@ class ControlPanel:
         self.open_start.set_value(s.get("open_panel_on_start", True))
         self.scan_lms.set_value(s.get("scan_lmstudio", True))
         self.check_upd.set_value(s.get("check_updates", True))
+        self.simple_t.set_value(bool(self.st.get("simple")))
+        self.simple_t.setEnabled(not self.st.get("lite"))
         self.auto.set_value(self.st.get("autostart"))
 
     def toggle_autostart(self, on):

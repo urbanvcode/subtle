@@ -18,6 +18,8 @@ const DEFAULTS = {
   saveTranscript: false,
   speakers: false,
   autoStart: false,
+  learning: false,
+  reading: "furigana",
   ...SubtleStyle.DEFAULTS, // subtitle look (substyle.js)
 };
 const VERSION = chrome.runtime.getManifest().version;
@@ -266,6 +268,24 @@ function renderMode() {
         ? "Whisper writes down the speech, the translator turns it into natural lines using context. ~0.1-0.2 s per line."
         : "Whisper translates straight to English. Fastest, more literal.";
   renderModels();
+  renderLearning();
+}
+
+// Learning mode works on the original line, which only the Best engine writes down.
+function renderLearning() {
+  $("readingRow").classList.toggle("hidden", !(s.learning && s.language === "ja") || isSimple());
+  const hint = $("learnHint");
+  const best = s.mode === "llm" || s.target !== "en";
+  const base = "The original line with readings (furigana, pinyin, romanization). Click a word to see what it means.";
+  hint.textContent = s.learning && !best ? base + " Switch to the Best engine for it." : base + " Best engine.";
+}
+
+// Simple mode (a setting in the Subtle app) and Subtle Lite hide the extra features.
+const isSimple = () => !!(info && info.simple);
+function renderSimple() {
+  for (const el of document.querySelectorAll(".extra")) el.classList.toggle("hidden", isSimple());
+  if (isSimple()) $("saveRow").classList.add("hidden");
+  renderLearning();
 }
 
 function renderVersion() {
@@ -292,6 +312,7 @@ async function loadInfo() {
   $("refresh").disabled = false;
   renderMode();
   renderVersion();
+  renderSimple();
 }
 
 // ---- subtitle style ----------------------------------------------------------------
@@ -417,10 +438,13 @@ async function init() {
   $("transcript").checked = s.saveTranscript;
   $("speakers").checked = s.speakers;
   $("autoStart").checked = s.autoStart;
+  $("learning").checked = s.learning;
+  fillSelect($("reading"), [["furigana", "Furigana (hiragana over kanji)"], ["romaji", "Romaji (Latin letters)"]], s.reading);
   $("server").value = s.serverUrl;
 
   $("language").onchange = (e) => {
     save({ language: e.target.value });
+    renderLearning();
     renderModels();            // "Auto" may pick a different model for this language
   };
   $("target").onchange = (e) => {
@@ -452,6 +476,11 @@ async function init() {
   $("transcript").onchange = (e) => save({ saveTranscript: e.target.checked });
   $("speakers").onchange = (e) => save({ speakers: e.target.checked });
   $("autoStart").onchange = (e) => save({ autoStart: e.target.checked });
+  $("learning").onchange = (e) => {
+    save({ learning: e.target.checked });
+    renderLearning();
+  };
+  $("reading").onchange = (e) => save({ reading: e.target.value });
   $("server").onchange = (e) => {
     save({ serverUrl: e.target.value.trim() });
     loadInfo();

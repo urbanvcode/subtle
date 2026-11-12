@@ -34,6 +34,10 @@
 - **Light**: uses no video memory until you start subtitles, and unloads by itself when you stop.
 - **Easy**: one-click install, a normal Windows app to manage models, and a browser extension with a
   start button.
+- **Subtitles for any app**: Discord, Zoom, games, VLC, a film on your PC. Subtle listens to what your
+  speakers play and shows subtitles at the bottom of your screen.
+- **Learning mode**: the original line with furigana or romaji (Japanese), pinyin (Chinese) or
+  romanization (Korean). Click a word to see what it means; the video waits for you.
 - **Save subtitles** as `.srt` or `.vtt` files that work in VLC and other players.
 - **Catch me up**: missed something? A short summary of the last few minutes appears on the video.
 - **Yours to arrange**: drag the subtitles anywhere on the video (remembered per site), hide them or
@@ -85,6 +89,16 @@ after the speaker stopped:
 
 You can change the keys at `chrome://extensions/shortcuts`.
 
+## Subtitles for any app
+
+For Discord, Zoom, games, VLC or a film on your PC (not in the browser): open the Subtle window, pick the
+languages under **Subtitles for any app** on the Home page and press **Start**. Subtle listens to what
+your speakers play and shows the subtitles at the bottom of your screen, on top of every window (clicks
+go straight through them). Size, position, box and screen can be changed right there.
+
+- Games in exclusive fullscreen draw over everything: use borderless or windowed mode.
+- If a browser tab is also subtitled, both get subtitles: stop one of them.
+
 ## How it works
 
 ```
@@ -114,7 +128,10 @@ video in a browser tab ─► Subtle extension ─► Subtle app on your PC ─�
 
 ## Install (about 10 minutes)
 
-1. **[Download Subtle](https://github.com/ddsaamir/subtle/releases/latest)** (the `.zip` under *Assets*) and unzip it somewhere with free space, e.g. `D:\Subtle`.
+1. **[Download Subtle](https://github.com/ddsaamir/subtle/releases/latest)** (`Subtle-<version>.zip` under *Assets*) and unzip it somewhere with free space, e.g. `D:\Subtle`.
+   Want only the basics? Take **`Subtle-Lite-<version>.zip`**: just subtitles and translation for the
+   browser, no extra features, about 260 MB smaller. (The full version can hide its extras too:
+   **Settings → Simple mode**.)
 2. **Double-click `Install Subtle.bat`.** It sets up everything inside that folder (a private
    Python, the translator engine) and creates a **Subtle** shortcut on the desktop and in the Start
    menu. Nothing is installed system-wide.
@@ -226,6 +243,9 @@ Subtle only uses memory while you're actually watching something with subtitles:
 - **Speaker voiceprints** (Identify speakers, off by default) are kept in memory only.
 - **Error log:** `logs\errors.log` keeps errors only, never subtitle text (about 1 MB at most).
 - **Catch me up** summaries are made by the translator on your PC, from subtitles kept in memory.
+- **Subtitles for any app** record what your speakers play only while it is switched on, and send it
+  only to the speech engine on your PC. Nothing is saved.
+- **Learning mode** word lookups are answered by the translator on your PC.
 - **Saved subtitle files** (`.srt` / `.vtt`) are only made when you press Save subtitles.
 - The internet is used only by `Install Subtle.bat`, the **Download** buttons on the Models page, and
   a daily check for new versions: Subtle asks GitHub for the newest version number and sends nothing
@@ -264,6 +284,7 @@ delete the Subtle folder and the two shortcuts, and remove the extension from th
 | Auto-start when a video plays | Subtitles start by themselves on any tab where a video plays with sound (not for DRM video) |
 | Catch me up | Shows a short summary of the last few minutes on the video (uses the translator model) |
 | Save subtitles | Saves this video's subtitles as `.srt` or `.vtt`, with the original line too if *Original-language line* is on |
+| Learning mode | Shows the original line with readings (furigana or romaji, pinyin, romanization). Click a word for its meaning. Needs the Best engine |
 
 ## For developers
 

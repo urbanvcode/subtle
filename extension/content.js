@@ -25,7 +25,7 @@
 
   const STYLE = globalThis.SubtleStyle; // substyle.js, loaded just before this file
   const SETTINGS = { fontScale: 1, showPartial: true, position: 8, showOriginal: false, autoStart: false,
-    ...(STYLE ? STYLE.DEFAULTS : {}) };
+    learning: false, ...(STYLE ? STYLE.DEFAULTS : {}) };
   let settings = { ...SETTINGS };
   let active = false;
   let video = null; // the video being watched in this frame
@@ -333,7 +333,12 @@
         .src { font-size: .7em; font-weight: 500; opacity: .9; margin-top: -.1em; }`;
     // The lines themselves can be dragged (the rest of the overlay lets clicks through to the player).
     const dragCss = `.line { pointer-events: auto; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
-      .box.dragging .line { cursor: grabbing; outline: 2px dashed rgba(255, 255, 255, .55); outline-offset: 2px; }`;
+      .box.dragging .line { cursor: grabbing; outline: 2px dashed rgba(255, 255, 255, .55); outline-offset: 2px; }
+      .src.learn { font-size: .9em; opacity: 1; line-height: 1.9; }
+      .src.learn ruby { ruby-position: over; }
+      .src.learn rt { font-size: .5em; font-weight: 500; opacity: .85; letter-spacing: .02em; }
+      .word { cursor: pointer; border-radius: .15em; }
+      .word:hover { background: rgba(255, 255, 255, .16); text-decoration: underline dotted; text-underline-offset: .2em; }`;
     root.innerHTML = `<style>${css}${dragCss}</style>
       <div class="box"><div class="line prev"></div><div class="line cur"></div><div class="line src"></div></div>`;
     boxEl = root.querySelector(".box");
@@ -352,14 +357,16 @@
       e.stopPropagation(); // the player underneath must not see these (no pause on click)
     };
     root.addEventListener("pointerdown", (e) => {
-      if (e.button !== 0 || !e.target.classList || !e.target.classList.contains("line")) return;
+      const line = e.target.closest && e.target.closest(".line");
+      if (e.button !== 0 || !line) return;
       stop(e);
       e.preventDefault();
       const g = geometry();
       const p = currentPos();
-      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, px: p.x, py: p.y, g, moved: false };
+      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, px: p.x, py: p.y, g, moved: false,
+        word: e.target.closest(".word") };
       try {
-        e.target.setPointerCapture(e.pointerId);
+        line.setPointerCapture(e.pointerId);
       } catch {}
     });
     root.addEventListener("pointermove", (e) => {
@@ -380,10 +387,11 @@
     const end = (e) => {
       if (!drag || e.pointerId !== drag.id) return;
       stop(e);
-      const moved = drag.moved;
+      const { moved, word } = drag;
       drag = null;
       boxEl.classList.remove("dragging");
       if (moved) saveSitePos(sitePos);
+      else if (word && e.type === "pointerup") lookUp(word); // a click on a word (learning mode)
     };
     root.addEventListener("pointerup", end);
     root.addEventListener("pointercancel", end);
@@ -496,8 +504,54 @@
     }
   }
 
-  function setSrc(src) {
-    if (srcEl) srcEl.textContent = settings.showOriginal && src ? src : "";
+  function setSrc(src, tokens) {
+    if (!srcEl) return;
+    srcEl.classList.remove("learn");
+    if (settings.learning && src && Array.isArray(tokens) && tokens.length) {
+      // Learning mode: the original line word by word, with readings over them; click a word to look it up.
+      srcEl.textContent = "";
+      srcEl.classList.add("learn");
+      srcEl.dataset.src = src;
+      for (const [surface, reading, lemma] of tokens) {
+        if (!lemma) {
+          srcEl.appendChild(document.createTextNode(surface));
+          continue;
+        }
+        const w = document.createElement("span");
+        w.className = "word";
+        w.dataset.lemma = lemma;
+        if (reading) {
+          const ruby = document.createElement("ruby");
+          ruby.textContent = surface;
+          const rt = document.createElement("rt");
+          rt.textContent = reading;
+          ruby.appendChild(rt);
+          w.appendChild(ruby);
+        } else {
+          w.textContent = surface;
+        }
+        srcEl.appendChild(w);
+      }
+      return;
+    }
+    srcEl.textContent = (settings.showOriginal || settings.learning) && src ? src : "";
+  }
+
+  // ---- learning mode: what does this word mean? -----------------------------------
+  let pausedForWord = null;
+  function lookUp(wordEl) {
+    const lemma = wordEl.dataset.lemma || wordEl.textContent;
+    const surface = wordEl.querySelector("ruby") ? wordEl.querySelector("ruby").firstChild.textContent : wordEl.textContent;
+    const context = srcEl ? srcEl.dataset.src || srcEl.textContent : "";
+    const rt = wordEl.querySelector("rt");
+    const reading = rt ? rt.textContent : "";
+    const v = video && video.isConnected ? video : pickVideo();
+    if (v && !v.paused) {
+      pausedForWord = v; // look at the word in peace; the video goes on when the card is closed
+      v.pause();
+    }
+    showNote(surface, "Looking it up…", 0);
+    if (alive()) chrome.runtime.sendMessage({ cmd: "define-word", word: lemma, surface, reading, context }).catch(() => {});
   }
 
   function refreshVisibility() {
@@ -525,13 +579,13 @@
     }, 4000);
   }
 
-  function showFinal(text, src, speaker) {
+  function showFinal(text, src, speaker, tokens) {
     ensureHost();
     moveCurrentUp();
     curEl.classList.remove("partial");
     setLine(curEl, text);
     curEl.style.color = speakerColour(speaker);
-    setSrc(src);
+    setSrc(src, tokens);
     raise();
     refreshVisibility();
     clearTimeout(hideTimer);
@@ -547,14 +601,14 @@
     }, ms);
   }
 
-  function showPartial(text, src) {
+  function showPartial(text, src, tokens) {
     ensureHost();
     moveCurrentUp(); // keep the last finished line visible above
     clearTimeout(hideTimer);
     curEl.classList.add("partial");
     setLine(curEl, text);
     curEl.style.color = ""; // speaker is known only once the line is finished
-    setSrc(src);
+    setSrc(src, tokens);
     refreshVisibility();
     // Normally the finished line replaces a preview within a second or two. If it never comes
     // (server stopped, connection lost), don't leave the preview on screen for ever.
@@ -624,6 +678,11 @@
 
   function hideNote() {
     clearTimeout(noteTimer);
+    if (pausedForWord) {
+      const v = pausedForWord;
+      pausedForWord = null;
+      if (v.isConnected && v.paused) v.play().catch(() => {});
+    }
     if (!note) return;
     try {
       note.host.hidePopover();
@@ -668,7 +727,7 @@
     } else if (action === "repeat") {
       if (!lastFinal) return showNote("No line yet", "", 1800);
       hiddenByUser = false;
-      showFinal(lastFinal.text, lastFinal.src, lastFinal.speaker);
+      showFinal(lastFinal.text, lastFinal.src, lastFinal.speaker, lastFinal.tokens);
     }
   }
 
@@ -683,6 +742,9 @@
         return false;
       case "hotkey":
         onHotkey(msg.action);
+        break;
+      case "define":
+        showNote(msg.word || "", msg.error || msg.text || "", 0);
         break;
       case "summary":
         if (msg.pending) showNote("Catching you up…", "Summarising the last few minutes", 0);
@@ -710,9 +772,9 @@
           lastFinalId = msg.id; // finished lines arrive in order; ids start over if the server restarts
           if (msg.text) {
             lastFinalText = msg.text;
-            lastFinal = { text: msg.text, src: msg.src, speaker: msg.speaker };
+            lastFinal = { text: msg.text, src: msg.src, speaker: msg.speaker, tokens: msg.tokens };
             recordCue(msg);
-            showFinal(msg.text, msg.src, msg.speaker);
+            showFinal(msg.text, msg.src, msg.speaker, msg.tokens);
           } else if (curEl && curEl.classList.contains("partial")) {
             // The line turned out to be nothing (noise, dropped): don't leave its preview behind.
             setLine(curEl, "");
@@ -725,7 +787,7 @@
           msg.text &&
           norm(msg.text) !== norm(lastFinalText) // a preview that repeats the last line
         ) {
-          showPartial(msg.text, msg.src);
+          showPartial(msg.text, msg.src, msg.tokens);
         }
         break;
       case "clear":

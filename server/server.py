@@ -168,6 +168,8 @@ class Config:
         self.page_title = ""                 # only used as the transcript's heading
         self.speakers = False                # identify speakers (off by default; voiceprints in memory only)
         self.partial_every = PARTIAL_EVERY   # previews of a line in progress; None = off (power saver)
+        self.learning = False                # learning mode: the original line comes with word readings
+        self.reading = "furigana"            # "furigana" | "romaji" (Japanese); Chinese: pinyin, Korean: romanization
 
     @property
     def use_llm(self) -> bool:
@@ -195,6 +197,10 @@ class Config:
             self.speakers = bool(msg["speakers"])
         if msg.get("page_title"):
             self.page_title = str(msg["page_title"])[:200]
+        if "learning" in msg:
+            self.learning = bool(msg["learning"])
+        if msg.get("reading") in ("furigana", "romaji", "off"):
+            self.reading = msg["reading"]
         if msg.get("previews") in PREVIEW_RATES:
             self.partial_every = PREVIEW_RATES[msg["previews"]]
 
@@ -726,6 +732,14 @@ class Session:
             msg["age"] = round(max(0.0, self.samples / SR - job.end_t), 2)
         if speaker is not None:
             msg["speaker"] = speaker
+        if self.cfg.learning and src and self.cfg.reading != "off":
+            try:
+                import readings
+                tokens = readings.annotate(src, self.cfg.language, self.cfg.reading)
+                if tokens:
+                    msg["tokens"] = tokens
+            except Exception as e:
+                report(f"[error] readings: {type(e).__name__}: {e}")
         await self.send(msg)
 
     async def send(self, obj: dict):

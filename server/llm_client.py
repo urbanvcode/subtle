@@ -196,6 +196,39 @@ def llm_summary(base_url: str, model: str, lines: list[str], language: str, time
     return out
 
 
+def llm_define(base_url: str, model: str, word: str, context: str, source: str | None, target: str,
+               surface: str = "", reading: str = "", timeout: float = 60) -> str:
+    """Learning mode: what one word of a subtitle means, for a learner, in the subtitle language."""
+    src_name, tgt_name = lang_name(source), lang_name(target)
+    system = (
+        f"You are a friendly {src_name} teacher. A learner clicked a word in a subtitle. Answer in {tgt_name}, "
+        f"in at most three short lines and 45 words: 1) the word in its dictionary form with its reading"
+        f"{' (kana and romaji)' if source == 'ja' else ' (pinyin)' if source in ('zh', 'yue') else ' (romanization)' if source == 'ko' else ''}"
+        f" and word type; 2) what it means in this sentence; 3) only if useful, a short note on grammar, "
+        f"politeness or slang. If a reading is given, it comes from a dictionary: use exactly that reading. "
+        f"No heading, no markdown."
+    )
+    word_line = f"Word: {surface or word}"
+    if surface and surface != word:
+        word_line += f" (dictionary form: {word})"
+    if reading:
+        word_line += f"\nReading: {reading}"
+    body = {
+        "model": model,
+        "temperature": 0,
+        "max_tokens": 160,
+        "stream": False,
+        "messages": [{"role": "system", "content": system},
+                     {"role": "user", "content": f"Sentence: {context}\n{word_line}"}],
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    data = _http_json(base_url.rstrip("/") + "/chat/completions", body, timeout=timeout)
+    out = THINK.sub("", data["choices"][0]["message"].get("content") or "").strip()
+    if "</think>" in out:
+        out = out.split("</think>")[-1].strip()
+    return out.replace("**", "")
+
+
 def llm_translate(base_url: str, model: str, text: str, source: str | None, target: str,
                   context: list[tuple[str, str]], timeout: float = 20, call: LLMCall | None = None) -> str:
     src_name, tgt_name = lang_name(source), lang_name(target)

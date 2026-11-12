@@ -210,7 +210,7 @@
   <section class="card">
     <div id="status" class="status"><i></i><span id="statusText">Not running</span></div>
     <button id="toggle" class="main"></button>
-    <div class="tools">
+    <div class="tools extra" id="tools">
       <button id="catchUp" class="tool" title="A short summary of the last few minutes, shown on the video (Alt+Shift+U)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
         Catch me up</button>
@@ -274,6 +274,11 @@
       <span class="txt"><b>Identify speakers</b><small>A colour per voice, learned as it goes. Kept in memory only.</small></span>
       <input id="speakers" class="switch" type="checkbox" />
     </label>
+    <label class="opt extra" id="learnRow">
+      <span class="txt"><b>Learning mode</b><small id="learnHint">The original line with readings (furigana, pinyin, romanization). Click a word to see what it means. Best engine.</small></span>
+      <input id="learning" class="switch" type="checkbox" />
+    </label>
+    <label class="field extra hidden" id="readingRow">Japanese readings<select id="reading"></select></label>
   </section>
 
   <section class="card" id="styleCard">
@@ -340,8 +345,8 @@
 
   <footer>
     <p class="hint">Start/stop anywhere: <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>S</kbd></p>
-    <p class="hint"><kbd>H</kbd> hide · <kbd>L</kbd> last line again · <kbd>U</kbd> catch me up (with <kbd>Alt</kbd> <kbd>Shift</kbd>)</p>
-    <p class="hint">Drag the subtitles on the video to move them; double-click puts them back.</p>
+    <p class="hint extra"><kbd>H</kbd> hide · <kbd>L</kbd> last line again · <kbd>U</kbd> catch me up (with <kbd>Alt</kbd> <kbd>Shift</kbd>)</p>
+    <p class="hint extra">Drag the subtitles on the video to move them; double-click puts them back.</p>
     <p id="version" class="hint"></p>
   </footer>
 </div>

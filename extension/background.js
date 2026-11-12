@@ -12,9 +12,11 @@ const DEFAULTS = {
   saveTranscript: false,
   speakers: false,
   autoStart: false,
+  learning: false,
+  reading: "furigana",
 };
 // (the translator's address is set in the Subtle window, not here)
-const CONFIG_KEYS = ["language", "target", "mode", "asrModel", "llmModel", "saveTranscript", "speakers"];
+const CONFIG_KEYS = ["language", "target", "mode", "asrModel", "llmModel", "saveTranscript", "speakers", "learning", "reading"];
 
 async function serverConfig(pageTitle) {
   const s = await chrome.storage.sync.get(DEFAULTS);
@@ -26,6 +28,8 @@ async function serverConfig(pageTitle) {
     llm_model: s.llmModel,
     save_transcript: !!s.saveTranscript,
     speakers: !!s.speakers,
+    learning: !!s.learning,
+    reading: s.reading || "furigana",
   };
   if (pageTitle) cfg.page_title = pageTitle; // heading of a saved transcript only
   return cfg;
@@ -212,6 +216,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       case "summary": // from the offscreen document: the app's answer to "Catch me up"
         toTab(state.tabId, { type: "summary", ...msg.data }, state.subFrame ?? 0);
+        break;
+      case "define-word": // learning mode: a word was clicked on the video
+        if (sender.tab && sender.tab.id === state.tabId) {
+          chrome.runtime.sendMessage({ target: "offscreen", cmd: "define", word: msg.word, surface: msg.surface, reading: msg.reading, context: msg.context }).catch(() => {});
+        }
+        break;
+      case "define": // from the offscreen document: the app's answer
+        toTab(state.tabId, { type: "define", ...msg.data, word: (msg.data && msg.data.word) || "" }, state.subFrame ?? 0);
         break;
       case "catch-up": // the popup's button
         await catchUp(msg.tabId);
