@@ -5,6 +5,24 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-12
+
+### Added
+- **Linux** (Experimental): `./install.sh` sets everything up inside the Subtle folder, for NVIDIA (CUDA 13
+  or 12), AMD (ROCm: speech and translator on the graphics card), Intel (Vulkan translator) or no GPU.
+  Start it from the applications menu or `./subtle.sh`.
+- **macOS on Apple M-series** (Experimental): the same `./install.sh`; speech runs on the Apple GPU, the
+  translator on Metal. Start it with `Subtle.command`.
+- Both are installed and checked automatically on clean GitHub machines with every change
+  (the *Install test* badge on the README).
+- **Firefox** (Experimental): the extension for Firefox is in `extension-firefox/` and as its own download.
+  It subtitles the video on the page (not DRM sites like Netflix).
+- **Only one program** for *Subtitles for any app*: under *Listen to*, pick e.g. **Only Discord** and
+  Subtle hears just that program (Windows 10 version 2004 or newer).
+- **Subtle-Setup-<version>.exe**: an optional Windows installer that asks for a folder and sets Subtle
+  up there. The zip and `Install Subtle.bat` work as before.
+
+
 ## [0.7.0] - 2026-11-12
 
 ### Added
@@ -70,7 +88,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ddsaamir/subtle/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ddsaamir/subtle/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ddsaamir/subtle/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ddsaamir/subtle/releases/tag/v0.5.0

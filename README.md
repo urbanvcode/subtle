@@ -11,9 +11,10 @@
 
 <p align="center">
   <a href="https://github.com/ddsaamir/subtle/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ddsaamir/subtle?color=2fbf8f"></a>
-  <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4">
-  <img alt="Chrome, Edge, Brave, Opera, Vivaldi" src="https://img.shields.io/badge/browser-Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20Opera%20%7C%20Vivaldi-555">
+  <img alt="Windows, Linux, macOS" src="https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-0078d4">
+  <img alt="Chrome, Edge, Brave, Opera, Vivaldi, Firefox" src="https://img.shields.io/badge/browser-Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20Opera%20%7C%20Vivaldi%20%7C%20Firefox-555">
   <img alt="NVIDIA GPU" src="https://img.shields.io/badge/GPU-NVIDIA%206%20GB%2B-76b900">
+  <a href="https://github.com/ddsaamir/subtle/actions/workflows/install-test.yml"><img alt="Install test" src="https://github.com/ddsaamir/subtle/actions/workflows/install-test.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
@@ -96,6 +97,9 @@ languages under **Subtitles for any app** on the Home page and press **Start**. 
 your speakers play and shows the subtitles at the bottom of your screen, on top of every window (clicks
 go straight through them). Size, position, box and screen can be changed right there.
 
+- **Only one program:** under *Listen to*, pick **Only Discord** (or any program that is playing sound)
+  and Subtle hears just that program; music or videos elsewhere are left out. (Windows 10 version 2004
+  or newer. *Refresh this list* shows programs that started playing later.)
 - Games in exclusive fullscreen draw over everything: use borderless or windowed mode.
 - If a browser tab is also subtitled, both get subtitles: stop one of them.
 
@@ -114,34 +118,48 @@ video in a browser tab ─► Subtle extension ─► Subtle app on your PC ─�
 
 | | Minimum | Recommended |
 |---|---|---|
-| System | Windows 10 or 11, 64-bit | |
-| Browser | Any Chromium browser: **Chrome, Edge, Brave, Opera / Opera GX, Vivaldi**, Arc and others (not Firefox or Safari) | |
+| System | Windows 10 or 11 (64-bit), Linux (64-bit), or macOS on an Apple M-series Mac (Experimental) | Windows 11 |
+| Browser | Any Chromium browser: **Chrome, Edge, Brave, Opera / Opera GX, Vivaldi**, Arc and others. **Firefox** works too (Experimental, see below). Not Safari | |
 | Graphics card | NVIDIA GTX 16-series / RTX 20-series or newer, **6 GB** video memory | NVIDIA RTX 3060 / 4060 or better, **8 GB+** |
 | Memory (RAM) | 8 GB | 16 GB |
 | Disk | 8 GB + models (2-10 GB) | |
 | Internet | only for the install and model downloads | |
 
 - **Older NVIDIA cards (GTX 10-series)** work, but more slowly.
-- **AMD / Intel graphics, or no graphics card**: Subtle still installs. Speech recognition then runs
-  on the processor, which is slow, so use the small or medium speech model and the Fast engine.
+- **AMD and Intel graphics (Experimental)**:
+  - **Linux + AMD:** speech and translation both run on the graphics card (ROCm).
+  - **Windows + AMD or Intel, or Linux + Intel:** the translator runs on the graphics card (Vulkan), but
+    speech recognition runs on the processor. Use the small or medium speech model and the Fast engine.
+- **Apple M-series Macs (Experimental):** speech runs on the Apple GPU where it can, and the translator on
+  Metal.
+- **No graphics card:** Subtle still works on the processor, slowly. Use small models and Fast.
 - Keep your NVIDIA driver reasonably up to date. The installer tells you if it's too old.
+
+Experimental means it is installed and tested automatically on clean Linux and Mac machines with
+every change (on the Mac, speech runs on its Apple GPU), but not yet used day to day on that hardware. If you have one, please try it and
+[tell us how it went](https://github.com/ddsaamir/subtle/issues).
 
 ## Install (about 10 minutes)
 
-1. **[Download Subtle](https://github.com/ddsaamir/subtle/releases/latest)** (`Subtle-<version>.zip` under *Assets*) and unzip it somewhere with free space, e.g. `D:\Subtle`.
-   Want only the basics? Take **`Subtle-Lite-<version>.zip`**: just subtitles and translation for the
-   browser, no extra features, about 260 MB smaller. (The full version can hide its extras too:
-   **Settings → Simple mode**.)
-2. **Double-click `Install Subtle.bat`.** It sets up everything inside that folder (a private
-   Python, the translator engine) and creates a **Subtle** shortcut on the desktop and in the Start
-   menu. Nothing is installed system-wide.
-3. The **Subtle window** opens. Follow its **Setup guide**:
+### Windows
+
+1. **[Download Subtle](https://github.com/ddsaamir/subtle/releases/latest)** from *Assets*:
+   - **`Subtle-Setup-<version>.exe`**: double-click it. It asks where to put Subtle and installs it.
+   - or **`Subtle-<version>.zip`**: unzip it somewhere with free space (e.g. `D:\Subtle`) and
+     double-click **`Install Subtle.bat`**.
+   - Want only the basics? Take **`Subtle-Lite-<version>.zip`**: just subtitles and translation for the
+     browser, no extra features, about 260 MB smaller. (The full version can hide its extras too:
+     **Settings → Simple mode**.)
+
+   Either way, everything goes inside that one folder (a private Python, the translator engine), plus
+   a **Subtle** shortcut on the desktop and in the Start menu. Nothing is installed system-wide.
+2. The **Subtle window** opens. Follow its **Setup guide**:
    - **Download the recommended models.** It picks them for your graphics card, one click.
    - **Add the browser extension:** open `chrome://extensions` in your browser (this address works in
      Chrome, Edge, Brave, Opera and Vivaldi), turn on **Developer mode** (top right; in Edge it's on the
      left), click **Load unpacked**, and choose the `extension` folder inside Subtle.
      (The Setup guide has a button that copies the exact path.)
-4. Open a video, click the Subtle icon in the browser toolbar, then **Start subtitles on this tab**
+3. Open a video, click the Subtle icon in the browser toolbar, then **Start subtitles on this tab**
    (or press **Alt+Shift+S**).
 
 From then on, just start **Subtle** from the desktop shortcut. Closing its window keeps it running
@@ -149,10 +167,33 @@ in the tray (bottom right, next to the clock). It uses no video memory until you
 click the tray icon to open the window again. Want it always ready?
 **Settings → Start Subtle when Windows starts.**
 
-> Windows SmartScreen or your antivirus may ask about `Install Subtle.bat` the first time, because
-> it's a new, unsigned download. The installer only downloads from GitHub (the `uv` Python manager
-> and llama.cpp, both checksum-checked), PyTorch and PyPI (pinned package versions). Models come from
-> Hugging Face at pinned versions and are checksum-checked too.
+> Windows SmartScreen or your antivirus may ask about `Subtle-Setup.exe` or `Install Subtle.bat` the
+> first time, because it's a new, unsigned download. The installer only downloads from GitHub (the
+> `uv` Python manager and llama.cpp, both checksum-checked), PyTorch and PyPI (pinned package
+> versions). Models come from Hugging Face at pinned versions and are checksum-checked too.
+
+### Linux and macOS (Apple M-series)
+
+1. Download **`Subtle-<version>.zip`** (or the Lite zip) and unzip it, e.g. into `~/Subtle`.
+2. In a terminal, in that folder: `./install.sh` (it detects your graphics card; to choose yourself,
+   use `./install.sh --gpu nvidia`, or `nvidia-old`, `amd`, `intel` or `cpu`).
+3. Start Subtle: Linux: from your applications menu, or `./subtle.sh`. macOS: double-click
+   **`Subtle.command`** in the Subtle folder.
+4. Add the browser extension as on Windows (step 2 above).
+
+Linux needs `curl` and, for the tray icon, an AppIndicator-capable desktop. *Subtitles for any app*
+uses PulseAudio or PipeWire. On macOS the first start may need *System Settings → Privacy & Security →
+Open anyway*, because the download is not signed.
+
+### Firefox (Experimental)
+
+Firefox can't record a whole tab like Chromium browsers can, so it subtitles the video on the page
+itself. That works on YouTube and most players, but not on protected (DRM) sites such as Netflix.
+
+1. Open `about:debugging#/runtime/this-firefox` and click **Load Temporary Add-on…**.
+2. Choose `manifest.json` in the **`extension-firefox`** folder inside Subtle (or the
+   `Subtle-Firefox-extension-<version>.zip` from the release).
+3. Firefox removes temporary add-ons when it closes; a signed version for addons.mozilla.org is coming.
 
 ## Which models should I use?
 

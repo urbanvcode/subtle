@@ -976,7 +976,9 @@ def main():
         except Exception as e:
             log(f"[ui] no window ({type(e).__name__}: {e})")
     tray = None
-    if not args.no_tray:
+    # macOS only allows menu-bar icons from the main thread (Qt's): no tray there; starting Subtle again
+    # brings its window back.
+    if not args.no_tray and sys.platform != "darwin":
         try:
             import tray as tray_mod
             tray = tray_mod.start(sup, port)
