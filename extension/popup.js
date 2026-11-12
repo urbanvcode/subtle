@@ -186,7 +186,7 @@ function checkUpdates() {
         }
       } else finish(`You have the newest version (${m.version || VERSION}).`);
     };
-    ws.onerror = () => finish("Subtle isn't running - start it first.", true);
+    ws.onerror = () => checkGitHub(finish);
     setTimeout(() => {
       // an app older than 0.11 doesn't know this question
       finish("No answer: update the Subtle app once by hand (see the GitHub page).", true);
@@ -195,8 +195,72 @@ function checkUpdates() {
       } catch {}
     }, 15000);
   } catch {
-    finish("Subtle isn't running - start it first.", true);
+    checkGitHub(finish);
   }
+}
+
+// Subtle isn't running: checking needs no Subtle (the extension asks GitHub itself); installing does, as
+// Subtle replaces its own files. So a newer version is offered as "Start Subtle", which then updates.
+async function checkGitHub(finish) {
+  try {
+    const r = await fetch("https://api.github.com/repos/ddsaamir/subtle/releases/latest", {
+      headers: { Accept: "application/vnd.github+json" },
+      cache: "no-store",
+    });
+    if (!r.ok) throw new Error(String(r.status));
+    const rel = await r.json();
+    const latest = String(rel.tag_name || "").replace(/^v/, "");
+    if (latest && newer(latest, VERSION)) {
+      finish(`Subtle ${latest} is available. Start Subtle to install it.`);
+      showBanner("info", `Subtle ${latest} is available`,
+        "Subtle isn't running. Start it, then press Update now in its window or here.", "Start Subtle",
+        startSubtle);
+    } else {
+      finish(`You have the newest version (${VERSION}).`);
+    }
+  } catch {
+    finish("Couldn't reach GitHub to check. Is the internet connection on?", true);
+  }
+}
+
+// ---- Starting Subtle ----------------------------------------------------------------
+// Subtle registers a small helper with the browsers (native messaging, server/native_host.py) that starts
+// it with no question asked. Without it (Subtle never started since 0.14.3, or Linux / macOS) a page opens
+// that starts Subtle with a subtle:// link (the browser asks first).
+const NATIVE_HOST = "io.github.ddsaamir.subtle";
+
+async function startSubtle() {
+  let r = null;
+  try {
+    r = await chrome.runtime.sendNativeMessage(NATIVE_HOST, { cmd: "start" });
+  } catch {}
+  if (!r || !r.ok) {
+    await chrome.tabs.create({ url: chrome.runtime.getURL("launch.html") }).catch(() => {});
+    return window.close();
+  }
+  if (r.running) return; // it was running: its window is up now
+  showBanner("info", "Starting Subtle…", "Its window opens in a few seconds.");
+  for (let i = 0; i < 40; i++) { // until it answers, then show its window and read its state
+    await new Promise((res) => setTimeout(res, 750));
+    const up = await new Promise((res) => {
+      try {
+        const ws = new WebSocket(s.serverUrl);
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: "show_panel" }));
+          setTimeout(() => ws.close(), 300);
+          res(true);
+        };
+        ws.onerror = () => res(false);
+      } catch {
+        res(false);
+      }
+    });
+    if (up) {
+      $("banner").classList.add("hidden");
+      return loadInfo();
+    }
+  }
+  showBanner("warn", "Subtle didn't start", "Start it from the Subtle shortcut on the desktop or in the Start menu.");
 }
 
 // ---- Catch me up / Save subtitles --------------------------------------------------
@@ -638,7 +702,7 @@ async function init() {
   $("openPanel").onclick = () => {
     // Ask the Subtle app to show its window (it's a normal Windows window, not a web page). Not running:
     // a page that starts it with a subtle:// link and waits for it.
-    const start = () => chrome.tabs.create({ url: chrome.runtime.getURL("launch.html") }).then(() => window.close());
+    const start = startSubtle;
     try {
       const ws = new WebSocket(s.serverUrl);
       ws.onopen = () => {

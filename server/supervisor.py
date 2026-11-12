@@ -1014,6 +1014,7 @@ def main():
         show_running(port)                 # second start: bring the running Subtle's window up
         return
     if port == 8765:                       # the extension's "Subtle app" button can start this Subtle
+        winutil.register_native_host(SERVER_DIR / "native_host.py", ROOT / "runtime" / "native-host", EXTENSION_DIR)
         winutil.register_url_protocol(SERVER_DIR / "supervisor.py", ASSETS / "subtle.ico")
     sup = Supervisor(port, args.allow_any_origin)
     show = not args.hidden and (s.get("open_panel_on_start", True) or not s.get("first_run_done"))

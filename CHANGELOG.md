@@ -5,6 +5,19 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-12
+
+### Added
+- **Subtle app** in the extension starts Subtle with one click when it isn't running, with no question from
+  the browser: Subtle registers a small helper with Chrome, Edge, Brave, Chromium and Firefox (native
+  messaging, per user, no admin rights; only Subtle's own extension may use it). Without it (Linux, macOS,
+  or before Subtle has started once) the extension falls back to the subtle:// start page.
+
+### Changed
+- **Check for updates** in the extension works while Subtle isn't running: it asks GitHub itself, and a
+  newer version is offered with a **Start Subtle** button (installing needs Subtle, which replaces its
+  own files).
+
 ## [0.14.2] - 2026-11-12
 
 ### Fixed
@@ -220,7 +233,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.14.2...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/ddsaamir/subtle/compare/v0.14.2...v0.15.0
 [0.14.2]: https://github.com/ddsaamir/subtle/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/ddsaamir/subtle/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/ddsaamir/subtle/compare/v0.13.1...v0.14.0

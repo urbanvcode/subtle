@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Subtle",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "description": "A universal open-source video subtitle extension. Real-time subtitles and translation for any video, generated locally on your own GPU.",
   "icons": {
     "16": "icons/icon16.png",
@@ -15,7 +15,8 @@
     "offscreen",
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"

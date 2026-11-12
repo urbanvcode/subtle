@@ -163,6 +163,89 @@ def register_url_protocol(supervisor: Path, icon: Path | None = None) -> bool:
         return False
 
 
+NATIVE_HOST = "io.github.ddsaamir.subtle"
+FIREFOX_EXTENSION_ID = "subtle@ddsaamir.github.io"
+# where each browser looks for native messaging hosts (per user)
+NATIVE_HOST_KEYS = {
+    "chrome": r"Software\Google\Chrome\NativeMessagingHosts",
+    "chromium": r"Software\Chromium\NativeMessagingHosts",
+    "edge": r"Software\Microsoft\Edge\NativeMessagingHosts",
+    "brave": r"Software\BraveSoftware\Brave-Browser\NativeMessagingHosts",
+    "firefox": r"Software\Mozilla\NativeMessagingHosts",
+}
+
+
+def unpacked_extension_id(folder: Path) -> str:
+    """The id Chromium browsers give an extension loaded unpacked from this folder (hash of its path)."""
+    p = str(Path(folder).resolve())
+    if sys.platform == "win32" and len(p) > 1 and p[1] == ":" and p[0].islower():
+        p = p[0].upper() + p[1:]
+    data = p.encode("utf-16-le") if sys.platform == "win32" else p.encode("utf-8")
+    import hashlib
+    return "".join(chr(ord("a") + int(c, 16)) for c in hashlib.sha256(data).hexdigest()[:32])
+
+
+def installed_extension_ids(folder: Path) -> set[str]:
+    """Ids of Subtle's extension in the browsers on this PC: the one for `folder`, and any other unpacked
+    copy of it the browsers know (loaded from another folder)."""
+    ids = {unpacked_extension_id(folder)}
+    base = Path(os.environ.get("LOCALAPPDATA", ""))
+    for browser in ("Google/Chrome", "Chromium", "Microsoft/Edge", "BraveSoftware/Brave-Browser",
+                    "Vivaldi", "Opera Software/Opera Stable"):
+        root = base / browser / "User Data"
+        prefs = list(root.glob("*/Secure Preferences")) + list(root.glob("*/Preferences")) if root.is_dir() else []
+        for pref in prefs:
+            try:
+                import json
+                with open(pref, encoding="utf-8") as f:
+                    settings = (json.load(f).get("extensions") or {}).get("settings") or {}
+                for eid, info in settings.items():
+                    path = Path(str(info.get("path") or ""))
+                    if info.get("location") == 4 and path.is_absolute() and (path / "manifest.json").is_file():
+                        with open(path / "manifest.json", encoding="utf-8") as f:
+                            if str(json.load(f).get("name", "")).startswith("Subtle"):
+                                ids.add(eid)
+            except (OSError, ValueError, AttributeError):
+                continue
+    return ids
+
+
+def register_native_host(host_script: Path, out_dir: Path, extension_dir: Path) -> bool:
+    """Windows: register native_host.py with Chrome, Chromium, Edge, Brave and Firefox (per user, no admin
+    rights), so the extension can start Subtle without asking. Only Subtle's extension may use it."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import json
+        import winreg
+        out_dir.mkdir(parents=True, exist_ok=True)
+        launcher = out_dir / "subtle-host.bat"
+        python = str(Path(windowless_python()).with_name("python.exe"))      # stdin/stdout: not pythonw
+        text = f'@echo off\r\n"{python}" "{host_script}" %*\r\n'
+        if not launcher.is_file() or launcher.read_text(encoding="utf-8") != text:
+            launcher.write_text(text, encoding="utf-8", newline="")
+        common = {"name": NATIVE_HOST, "description": "Starts Subtle for its browser extension",
+                  "path": str(launcher), "type": "stdio"}
+        manifests = {
+            "chromium": dict(common, allowed_origins=sorted(f"chrome-extension://{i}/"
+                                                            for i in installed_extension_ids(extension_dir))),
+            "firefox": dict(common, allowed_extensions=[FIREFOX_EXTENSION_ID]),
+        }
+        files = {}
+        for kind, m in manifests.items():
+            f = out_dir / f"{NATIVE_HOST}.{kind}.json"
+            data = json.dumps(m, indent=2)
+            if not f.is_file() or f.read_text(encoding="utf-8") != data:
+                f.write_text(data, encoding="utf-8")
+            files[kind] = str(f)
+        for browser, key in NATIVE_HOST_KEYS.items():
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key + "\\" + NATIVE_HOST) as k:
+                winreg.SetValueEx(k, "", 0, winreg.REG_SZ, files["firefox" if browser == "firefox" else "chromium"])
+        return True
+    except OSError:
+        return False
+
+
 def startup_shortcut() -> Path:
     if sys.platform == "win32":
         return Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Subtle.lnk"
