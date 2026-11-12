@@ -38,6 +38,8 @@ DEFAULTS = {
     "pc_opacity": 62,                    # box behind the text, %
     "pc_screen": 0,                      # which monitor (0 = main)
     "pc_width": 80,                      # % of the screen width a line may use
+    "pc_x": 500,                         # moved by hand: centre of the lines, ‰ of the screen width
+    "pc_y": -1,                          # moved by hand: bottom of the lines, ‰ up from the bottom (-1 = pc_height)
     "pc_text_color": "#ffffff",
     "pc_bg_color": "#08080c",
     "pc_edge": "soft",                   # none | soft | outline | drop

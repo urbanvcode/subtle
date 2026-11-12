@@ -163,6 +163,9 @@
   .presets button:hover { background: var(--field-hover); }
   .presets button.on { border-color: var(--accent); background: var(--accent-soft); }
   .row2 { display: flex; align-items: center; gap: 12px; }
+  .posrow { display: flex; align-items: center; gap: 6px; }
+  .posrow .posets { flex: 1; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .posrow .iconbtn { height: 30px; align-self: auto; }
   .row2 .lbl { width: 34px; flex: none; font-size: 12px; color: var(--muted); }
   .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
   .swatch { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0;
@@ -332,6 +335,10 @@
         <input id="size" type="range" min="0.6" max="2" step="0.05" /></label>
       <label class="slider"><span class="top">Height <b id="posVal"></b></span>
         <input id="pos" type="range" min="2" max="40" step="1" /></label>
+    </div>
+    <div class="posrow">
+      <div class="presets posets" id="posPresets"></div>
+      <button id="posReset" class="iconbtn" title="Bottom in the middle again, also where you dragged them on this site">Reset</button>
     </div>
     <label class="opt">
       <span class="txt"><b>In-progress lines</b><small>Show a line while it's still being spoken</small></span>

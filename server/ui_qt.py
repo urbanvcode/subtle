@@ -71,7 +71,7 @@ NAV = (("Subtitles", (("home", "Home"), ("anyapp", "Any app"))),
 PAGES = tuple(item for _, items in NAV for item in items)
 SUBTITLES = {
     "home": "What Subtle is doing, how fast subtitles arrive, and how much memory it uses.",
-    "anyapp": "Subtitles for Discord, Zoom, games, VLC or a film on your PC, on top of every window.",
+    "anyapp": "Subtitles for anything your PC plays (apps, games, films, any browser), on top of every window.",
     "models": "Speech and translator models on this PC. Download what you need; delete what you don't.",
     "languages": "Which speech model each language uses, and the translator behind the Best engine.",
     "settings": "Memory and speed, the translator engine, starting, updates and files.",
@@ -1126,7 +1126,8 @@ class ControlPanel:
                   tip="Subtle listens to what your PC plays and puts subtitles on top of every window; clicks go straight "
                       "through them.<br><br>Games in exclusive fullscreen cover the subtitles: use borderless or "
                       "windowed mode.<br>Nothing is recorded: the sound only goes to the speech engine on this PC.",
-                  sub="For Discord, Zoom, games, VLC or a film on your PC. Browser tabs work best with the extension.",
+                  sub="For Discord, Zoom, games, VLC, a film on your PC, and videos in any browser too: no extension needed. "
+                      "The extension adds learning mode, saving subtitles and Catch me up.",
                   right=(self.pc_btn,))
         self.pc_state = self.label("", "small", wrap=True)
         ml.addWidget(self.pc_state)
@@ -1170,8 +1171,10 @@ class ControlPanel:
 
         from overlay_qt import BG_COLORS, EDGES, FONTS, PRESETS, TEXT_COLORS, TIMES, WEIGHTS, SubtitlePreview
         vc, vl = self.card((22, 18, 22, 18))
-        self.head(vl, "look", "How the subtitles look", sub="Changes show right away, also while subtitles run.")
-        self.pc_preview = SubtitlePreview()
+        self.head(vl, "look", "How the subtitles look",
+                  sub="Changes show right away, also while subtitles run. Drag the subtitles in the picture to "
+                      "place them on your screen.")
+        self.pc_preview = SubtitlePreview(on_moved=lambda ch: self.pc_save(False, **ch))
         vl.addWidget(self.pc_preview)
         presets = QHBoxLayout()
         presets.setSpacing(6)
@@ -1185,14 +1188,20 @@ class ControlPanel:
         vl.addSpacing(6)
         vl.addLayout(presets)
 
-        def look(key, choices):
-            cb = self.combo(choices, lambda v: self.pc_save(False, **{key: v}))
+        def look(key, choices, extra=None):
+            def pick(v):
+                if v != "moved":                       # "Moved by hand" only says where they are
+                    self.pc_save(False, **{key: v}, **(extra or {}))
+            cb = self.combo(choices, pick)
             self.pc_look[key] = cb
             return cb
         self.pc_look = {}
+        self.pc_heights = [(2, "Very low"), (5, "Low"), (8, "Bottom (default)"), (14, "A bit higher"),
+                           (25, "Higher"), (45, "Middle"), (85, "Top")]
         rows = [
             [("Text size", look("pc_size", [(v, f"{v}%") for v in (70, 85, 100, 125, 150, 200)])),
-             ("Position", look("pc_height", [(v, f"{v}% up") for v in (2, 5, 8, 12, 20, 30, 45)])),
+             # picking a height puts the lines back in the middle (after moving them by hand)
+             ("Position", look("pc_height", self.pc_heights, extra={"pc_x": 500, "pc_y": -1})),
              ("Line width", look("pc_width", [(v, f"{v}% of the screen") for v in (50, 60, 70, 80, 90, 100)])),
              ("Screen", look("pc_screen", [(0, "Main screen")]))],
             [("Text colour", look("pc_text_color", TEXT_COLORS)),
@@ -1222,6 +1231,17 @@ class ControlPanel:
         vl.addLayout(grid)
         self.pc_keep_t = Toggle(c, lambda v: self.pc_save(False, pc_keep_prev=v))
         self.pc_src_t = Toggle(c, lambda v: self.pc_save(False, pc_show_src=v))
+        self.pc_move_btn = self.button("Move on screen", self.pc_move_toggle, small=True)
+        self.pc_reset_btn = self.button("Reset", lambda: self.pc_save(False, pc_x=500, pc_y=-1, pc_height=8), small=True)
+        place = QWidget()
+        pl = QHBoxLayout(place)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(8)
+        pl.addWidget(self.pc_reset_btn)
+        pl.addWidget(self.pc_move_btn)
+        self.setting_row(vl, "Place them on your screen", "Shows the subtitles as a box on your screen: drag it over "
+                         "the app you watch, then double-click it or press Enter. Reset puts them back at the bottom "
+                         "in the middle.", place)
         self.setting_row(vl, "Keep the previous line", "Shows the line before, dimmed, above the new one.",
                          self.pc_keep_t)
         self.setting_row(vl, "Show the original line", "The words as spoken, under the translation (Best engine).",
@@ -1232,12 +1252,15 @@ class ControlPanel:
 
     # ---------------------------------------------------------------- PC sound
     def pc_toggle(self):
-        running = (self.st.get("pc") or {}).get("running")
+        # what the button says is what it does (the state can be up to 2 s old)
+        stop = self.pc_btn.text() == "Stop"
         self.pc_btn.setEnabled(False)
+        self.set_text(self.pc_btn, "Stopping…" if stop else "Starting…")
+
         def done(r):
             self.pc_btn.setEnabled(True)
-            self.refresh()
-        self.cmd("pc_stop" if running else "pc_start", done)
+            self.refresh(True)             # redraws the button right away
+        self.cmd("pc_stop" if stop else "pc_start", done)
 
     def pc_save(self, restart=True, **changes):
         running = (self.st.get("pc") or {}).get("running")
@@ -1274,12 +1297,24 @@ class ControlPanel:
             self.overlay = SubtitleOverlay()
         self.overlay.apply_style(s)
 
-    def pc_message(self, msg):
+    def _pc_overlay(self):
         if self.overlay is None:
             from overlay_qt import SubtitleOverlay
             self.overlay = SubtitleOverlay()
             self.overlay.apply_style(self.st.get("settings", {}))
-        self.overlay.on_message(msg)
+        return self.overlay
+
+    def pc_move_toggle(self):
+        o = self._pc_overlay()
+        if o.moving:
+            o.set_move_mode(False)
+            return
+        self.set_text(self.pc_move_btn, "Done")
+        o.set_move_mode(True, on_moved=lambda ch: self.pc_save(False, **ch),
+                        on_done=lambda: self.set_text(self.pc_move_btn, "Move on screen"))
+
+    def pc_message(self, msg):
+        self._pc_overlay().on_message(msg)
 
     def pc_load_sources(self):
         """"Listen to": everything on a speaker, or one program only (Windows 10 2004+)."""
@@ -1310,8 +1345,14 @@ class ControlPanel:
         screens = QApplication.screens()
         self.fill_combo(self.pc_look["pc_screen"],
                         [(i, "Main screen" if i == 0 else f"Screen {i + 1}") for i in range(len(screens))])
+        moved = int(look["pc_y"]) >= 0 or int(look["pc_x"]) != 500
+        heights = list(self.pc_heights)
+        if not moved and all(v != look["pc_height"] for v, _ in heights):     # a height from an older version
+            heights.append((look["pc_height"], f"{look['pc_height']}% up"))
+        self.fill_combo(self.pc_look["pc_height"], heights + ([("moved", "Moved by hand")] if moved else []))
+        self.pc_reset_btn.setEnabled(moved or look["pc_height"] != 8)
         for key, cb in self.pc_look.items():
-            self.set_combo(cb, look[key])
+            self.set_combo(cb, "moved" if key == "pc_height" and moved else look[key])
         self.pc_keep_t.set_value(bool(look["pc_keep_prev"]))
         self.pc_src_t.set_value(bool(look["pc_show_src"]))
         self.pc_look["pc_src_size"].setEnabled(bool(look["pc_show_src"]))
@@ -2288,6 +2329,8 @@ class ControlPanel:
                 self.go("help")
         elif self.page == "languages":
             self.render_llm_status()
+        elif self.page == "anyapp" and self.pc_btn.isEnabled():
+            self.render_pc()               # Start / Stop and "Listening to…" follow the real state
 
 
 __all__ = ["ControlPanel"]

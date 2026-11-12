@@ -19,6 +19,7 @@ SPEAKER_COLOURS = ["#ffe873", "#8fd8ff", "#a8f0a0", "#ffb3de", "#ffc285", "#cdb8
 # settings keys (settings.py) and their defaults
 DEFAULTS = {
     "pc_size": 100, "pc_height": 8, "pc_screen": 0, "pc_width": 80,
+    "pc_x": 500, "pc_y": -1,          # moved by hand: centre (‰ of the screen width) and bottom (‰ up); -1 = pc_height
     "pc_text_color": "#ffffff", "pc_bg_color": "#08080c", "pc_opacity": 62, "pc_edge": "soft",
     "pc_font": "default", "pc_weight": "semibold", "pc_line_time": "normal",
     "pc_keep_prev": True, "pc_show_src": False, "pc_src_size": 70,
@@ -52,6 +53,16 @@ def style_from(settings: dict) -> dict:
     s = dict(DEFAULTS)
     s.update({k: settings[k] for k in DEFAULTS if k in settings and settings[k] is not None})
     return s
+
+
+def placement(s: dict, width: float, height: float) -> tuple[float, float, float]:
+    """(centre x, bottom y, line width) of the subtitles in a width x height area (a screen or the preview)."""
+    line_w = width * max(30, min(100, int(s["pc_width"] or 80))) / 100
+    cx = width * max(0, min(1000, int(s["pc_x"]))) / 1000
+    cx = max(line_w / 2, min(width - line_w / 2, cx))           # the lines stay on the screen
+    up = int(s["pc_y"]) if int(s["pc_y"]) >= 0 else int(s["pc_height"] or 0) * 10
+    bottom = height - height * max(0, min(950, up)) / 1000
+    return cx, bottom, line_w
 
 
 class Painter:
@@ -167,10 +178,16 @@ class Painter:
 
 
 class SubtitleOverlay(QWidget):
+    BASE = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoDropShadowWindowHint
+    CLICK_THROUGH = Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus
+    ACCENT = QColor("#2fbf8f")
+
     def __init__(self):
-        flags = (Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WindowTransparentForInput
-                 | Qt.WindowDoesNotAcceptFocus | Qt.NoDropShadowWindowHint)
-        super().__init__(None, flags)
+        super().__init__(None, self.BASE | self.CLICK_THROUGH)
+        self.moving = False                # "Move on screen": a box to drag, instead of click-through text
+        self.on_moved = self.on_done = None
+        self.drag = None
+        self.box = QRectF()
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -200,10 +217,11 @@ class SubtitleOverlay(QWidget):
             return
         g: QRect = scr.geometry()
         self.font_px = max(16, int(g.height() * 0.034 * int(s["pc_size"] or 100) / 100))
-        w = int(g.width() * max(30, min(100, int(s["pc_width"] or 80))) / 100)
-        h = int(g.height() * 0.45)
-        bottom = g.bottom() - int(g.height() * int(s["pc_height"] or 0) / 100)
-        self.setGeometry(g.left() + (g.width() - w) // 2, bottom - h, w, h)
+        cx, bottom, w = placement(s, g.width(), g.height())
+        # tall enough for a few wrapped lines above the bottom, never above the top of the screen
+        h = int(max(self.font_px * 4, min(g.height() * 0.45, bottom)))
+        if not self.drag:
+            self.setGeometry(int(g.left() + cx - w / 2), int(g.top() + bottom - h), int(w), h)
         if not s["pc_keep_prev"]:
             self.lines["prev"] = None
         if not s["pc_show_src"]:
@@ -214,7 +232,15 @@ class SubtitleOverlay(QWidget):
         """Wrap the visible lines (only when text or look changes: painting then just draws them)."""
         px, w, pt = self.font_px, self.width(), self.painter
         self.blocks = []
-        if self.lines["prev"]:
+        if self.moving and not self.lines["cur"]:          # something to see while placing the box
+            sample = SubtitlePreview.SAMPLE
+            if pt.s["pc_keep_prev"]:
+                self.blocks.append(pt.block(sample[0], px * .82, w, "", .7))
+            self.blocks.append(pt.block(sample[1], px, w))
+            if pt.s["pc_show_src"]:
+                self.blocks.append(pt.block(sample[2], px * max(40, min(100, int(pt.s["pc_src_size"]))) / 100, w,
+                                            "", .9, weight=QFont.Medium))
+        if self.lines["prev"] and not (self.moving and not self.lines["cur"]):
             text, colour = self.lines["prev"]
             self.blocks.append(pt.block(text, px * .82, w, colour, .7))
         if self.lines["cur"]:
@@ -237,8 +263,92 @@ class SubtitleOverlay(QWidget):
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        self.painter.stack(p, self.blocks, self.width() / 2, self.height() - 2)
+        if self.moving:
+            # the box to drag: the lines' area, tinted (a see-through pixel would let the click through)
+            gap = self.font_px * .18
+            h = sum(b["h"] for b in self.blocks) + gap * (len(self.blocks) - 1) + self.font_px * .5
+            self.box = QRectF(2, self.height() - 2 - h, self.width() - 4, h)
+            fill = QColor(self.ACCENT)
+            fill.setAlpha(46)
+            p.setBrush(fill)
+            p.setPen(QPen(self.ACCENT, 2, Qt.DashLine))
+            p.drawRoundedRect(self.box, 10, 10)
+            hint = "Drag to move  ·  double-click or press Enter when done"
+            f = QFont()
+            f.setPixelSize(max(13, int(self.font_px * .45)))
+            f.setWeight(QFont.DemiBold)
+            fm = QFontMetricsF(f)
+            hw, hh = fm.horizontalAdvance(hint) + 24, fm.height() + 10
+            pill = QRectF((self.width() - hw) / 2, max(0, self.box.top() - hh - 8), hw, hh)
+            p.setPen(Qt.NoPen)
+            p.setBrush(self.ACCENT)
+            p.drawRoundedRect(pill, hh / 2, hh / 2)
+            p.setPen(QColor("#06261b"))
+            p.setFont(f)
+            p.drawText(pill, Qt.AlignCenter, hint)
+        self.painter.stack(p, self.blocks, self.width() / 2, self.height() - 2 - (self.font_px * .25 if self.moving else 0))
         p.end()
+
+    # -- "Move on screen" ---------------------------------------------------------------------------
+    def set_move_mode(self, on: bool, on_moved=None, on_done=None):
+        """on: the subtitles become a box to drag (on_moved gets the new place as settings); off: click-through."""
+        if on == self.moving:
+            return
+        self.moving, self.drag = on, None
+        if on:
+            self.on_moved, self.on_done = on_moved, on_done
+        self.setWindowFlags(self.BASE if on else self.BASE | self.CLICK_THROUGH)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, not on)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, not on)
+        self.setCursor(Qt.SizeAllCursor if on else Qt.ArrowCursor)
+        self._relayout()
+        if on:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            self.setFocus()
+        else:
+            done, self.on_done = self.on_done, None
+            if done:
+                done()
+
+    def mousePressEvent(self, e):
+        if self.moving and e.button() == Qt.LeftButton and self.box.contains(e.position()):
+            self.drag = (e.globalPosition().toPoint(), self.pos())
+
+    def mouseMoveEvent(self, e):
+        if self.drag:
+            start, pos = self.drag
+            self.move(pos + e.globalPosition().toPoint() - start)
+
+    def mouseReleaseEvent(self, e):
+        if self.drag:
+            self.drag = None
+            self._commit_place()
+
+    def mouseDoubleClickEvent(self, e):
+        if self.moving:
+            self.set_move_mode(False)
+
+    def keyPressEvent(self, e):
+        if self.moving and e.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape):
+            self.set_move_mode(False)
+
+    def _commit_place(self):
+        """Where the box was dropped -> pc_screen, pc_x (centre, ‰ of the width), pc_y (bottom, ‰ up)."""
+        geo = self.frameGeometry()
+        centre = geo.center()
+        screens = QGuiApplication.screens()
+        scr = QGuiApplication.screenAt(centre) or self._screen(int(self.painter.s["pc_screen"] or 0))
+        if scr is None:
+            return
+        g = scr.geometry()
+        x = round((centre.x() - g.left()) / g.width() * 1000)
+        y = round((g.top() + g.height() - (geo.top() + geo.height())) / g.height() * 1000)
+        changes = {"pc_screen": screens.index(scr) if scr in screens else 0,
+                   "pc_x": max(0, min(1000, x)), "pc_y": max(0, min(950, y))}
+        if self.on_moved:
+            self.on_moved(changes)
 
     def _set(self, key, value):
         self.lines[key] = value
@@ -296,14 +406,20 @@ class SubtitlePreview(QWidget):
 
     SAMPLE = ("I thought you'd left already.", "Where were you last night?", "昨日の夜はどこにいたの？")
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, on_moved=None):
         super().__init__(parent)
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(170)
         self.painter = Painter({})
+        self.on_moved = on_moved          # dragging the lines here places them on the real screen
+        self.lines_rect = QRectF()
+        self.drag = None
+        self.setMouseTracking(True)
+        self.setToolTip("Drag the subtitles to place them on your screen")
 
     def set_style(self, settings: dict):
-        self.painter = Painter(settings)
-        self.update()
+        if style_from(settings) != self.painter.s:        # the page redraws every 2 s: repaint only on a change
+            self.painter = Painter(settings)
+            self.update()
 
     def paintEvent(self, e):
         p = QPainter(self)
@@ -319,7 +435,8 @@ class SubtitlePreview(QWidget):
         p.fillRect(r, grad)
         pt, s = self.painter, self.painter.s
         px = 17 * int(s["pc_size"] or 100) / 100
-        w = r.width() * max(30, min(100, int(s["pc_width"] or 80))) / 100
+        cx, bottom, w = placement(s, r.width(), r.height())
+        bottom = min(bottom, r.height() - 4)
         blocks = []
         if s["pc_keep_prev"]:
             blocks.append(pt.block(self.SAMPLE[0], px * .82, w, "", .7))
@@ -327,6 +444,43 @@ class SubtitlePreview(QWidget):
         if s["pc_show_src"]:
             blocks.append(pt.block(self.SAMPLE[2], px * max(40, min(100, int(s["pc_src_size"]))) / 100, w, "", .9,
                                    weight=QFont.Medium))
-        bottom = r.height() - max(4.0, r.height() * int(s["pc_height"] or 0) / 100)
-        pt.stack(p, blocks, r.width() / 2, bottom)
+        total = sum(b["h"] for b in blocks) + px * .18 * (len(blocks) - 1)
+        bottom = max(bottom, total + 4)                    # moved high up: still fully in the preview
+        pt.stack(p, blocks, cx, bottom)
+        bw = max(b["w"] for b in blocks)
+        self.lines_rect = QRectF(cx - bw / 2, bottom - total, bw, total)
+        if self.drag or self.underMouse() and self.lines_rect.contains(self.mapFromGlobal(self.cursor().pos()).toPointF()):
+            p.setPen(QPen(SubtitleOverlay.ACCENT, 1.5, Qt.DashLine))
+            p.setBrush(Qt.NoBrush)
+            p.drawRoundedRect(self.lines_rect.adjusted(-6, -5, 6, 5), 8, 8)
         p.end()
+
+    # dragging the lines: the preview stands for the whole screen
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton and self.lines_rect.contains(e.position()):
+            self.drag = (e.position(), self.lines_rect.center().x(), self.lines_rect.bottom())
+
+    def mouseMoveEvent(self, e):
+        over = self.lines_rect.contains(e.position())
+        self.setCursor(Qt.SizeAllCursor if self.drag or over else Qt.ArrowCursor)
+        if not self.drag:
+            self.update()                  # the dashed outline follows the mouse
+            return
+        start, cx, bottom = self.drag
+        d = e.position() - start
+        s = dict(self.painter.s)
+        s["pc_x"] = round(max(0, min(1000, (cx + d.x()) / self.width() * 1000)))
+        s["pc_y"] = round(max(0, min(950, (self.height() - bottom - d.y()) / self.height() * 1000)))
+        self.painter = Painter(s)
+        self.update()
+
+    def mouseReleaseEvent(self, e):
+        if self.drag:
+            self.drag = None
+            s = self.painter.s
+            if self.on_moved:
+                self.on_moved({"pc_x": s["pc_x"], "pc_y": s["pc_y"]})
+            self.update()
+
+    def leaveEvent(self, e):
+        self.update()

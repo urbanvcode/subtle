@@ -190,6 +190,11 @@ Open anyway*, because the download is not signed.
 Firefox can't record a whole tab like Chromium browsers can, so it subtitles the video on the page
 itself. That works on YouTube and most players, but not on protected (DRM) sites such as Netflix.
 
+**Tip: no extension needed.** The **Any app** page of the Subtle window subtitles whatever your speakers
+play, so it works in Firefox on every site, usually protected ones too, because it listens to the sound
+and not to the page. Choose *Only Firefox* under *What to listen to* to leave other sounds out, and drag
+the subtitles over the video. The extension adds learning mode, saving subtitles and Catch me up.
+
 1. Open `about:debugging#/runtime/this-firefox` and click **Load Temporary Add-on…**.
 2. Choose `manifest.json` in the **`extension-firefox`** folder inside Subtle (or the
    `Subtle-Firefox-extension-<version>.zip` from the release).

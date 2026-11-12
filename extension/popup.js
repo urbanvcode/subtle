@@ -594,9 +594,31 @@ async function init() {
     $("sizeVal").textContent = `${Math.round(e.target.value * 100)}%`;
     saveSize(Number(e.target.value));
   };
+  const setPos = (v) => {
+    $("pos").value = v;
+    $("posVal").textContent = `${v}%`;
+    for (const b of $("posPresets").children) b.classList.toggle("on", Number(b.dataset.pos) === Number(v));
+  };
   $("pos").oninput = (e) => {
-    $("posVal").textContent = `${e.target.value}%`;
+    setPos(e.target.value);
     savePos(Number(e.target.value));
+  };
+  for (const [v, label] of [[3, "Low"], [8, "Bottom"], [20, "Higher"], [40, "Middle"]]) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.dataset.pos = v;
+    b.onclick = () => {
+      setPos(v);
+      save({ position: v });
+    };
+    $("posPresets").appendChild(b);
+  }
+  setPos(s.position);
+  $("posReset").onclick = () => {
+    setPos(DEFAULTS.position);
+    save({ position: DEFAULTS.position });
+    // a spot they were dragged to on this site wins over the Height: forget it too
+    if (tab && tab.id != null) chrome.tabs.sendMessage(tab.id, { type: "reset-position" }).catch(() => {});
   };
   $("partial").onchange = (e) => save({ showPartial: e.target.checked });
   $("original").onchange = (e) => save({ showOriginal: e.target.checked });

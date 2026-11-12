@@ -5,6 +5,23 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-12
+
+### Added
+- **Place the subtitles anywhere on your screen (Any app).** Drag them in the preview, which stands for
+  your screen, or press **Move on screen** to drag a box over the app you watch (any monitor); double-click
+  or Enter when done. Named positions (Very low to Top) and a **Reset** put them back.
+- Extension: position buttons (Low, Bottom, Higher, Middle) and a **Reset** that also forgets where the
+  subtitles were dragged on the current site.
+
+### Fixed
+- The Any app **Start / Stop** button showed an old state, so pressing Stop could start the subtitles
+  again. It now always says what it will do, and shows Starting… / Stopping… meanwhile.
+
+### Changed
+- The Any app page says that it works in every browser without the extension; the README suggests it
+  for Firefox, where the extension can't hear protected sites.
+
 ## [0.12.0] - 2026-11-12
 
 ### Added
@@ -162,7 +179,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/ddsaamir/subtle/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ddsaamir/subtle/compare/v0.11.2...v0.12.0
 [0.11.2]: https://github.com/ddsaamir/subtle/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/ddsaamir/subtle/compare/v0.11.0...v0.11.1

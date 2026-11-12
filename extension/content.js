@@ -766,6 +766,15 @@
       case "hotkey":
         onHotkey(msg.action);
         break;
+      case "reset-position":
+        // the popup's Position "Reset": forget where they were dragged on this site
+        if (sitePos) {
+          sitePos = null;
+          posKey = "";
+          position();
+          saveSitePos(null);
+        }
+        break;
       case "define":
         showNote(msg.word || "", msg.error || msg.text || "", 0);
         break;
