@@ -5,6 +5,14 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-12
+
+### Changed
+- The Subtle window uses less CPU while it is open: graphics card readings come from the NVIDIA driver's
+  own library instead of starting nvidia-smi twice every few seconds (nvidia-smi is still the fallback).
+- The window stops refreshing while it is minimised and catches up as soon as it comes back.
+- Settings no longer re-reads the model catalog for every installed speech model on each refresh.
+
 ## [0.11.1] - 2026-11-12
 
 ### Fixed
@@ -143,7 +151,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/ddsaamir/subtle/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/ddsaamir/subtle/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ddsaamir/subtle/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ddsaamir/subtle/compare/v0.9.0...v0.10.0

@@ -103,15 +103,37 @@ def model_languages(model_id: str) -> tuple | None:
         return ("ja",)
     if "sensevoice" in name:
         return SENSEVOICE_LANGS
+    lang = _catalog_languages().get(name)
+    return (lang,) if lang else None
+
+
+_langs_cache: tuple[float, dict] | None = None
+
+
+def _catalog_languages() -> dict[str, str]:
+    """{model id or folder name (lower case): language} of the single-language speech models in the catalog,
+    read again only when catalog.json changes (Settings asks for every installed model on each refresh)."""
+    global _langs_cache
+    path = MODELS_DIR / "catalog.json"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return {}
+    if _langs_cache is not None and _langs_cache[0] == mtime:
+        return _langs_cache[1]
+    out: dict[str, str] = {}
     try:
         import json
-        with open(MODELS_DIR / "catalog.json", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             for m in json.load(f).get("models", []):
-                if m.get("kind") == "whisper" and m.get("language") and name in (m["id"].lower(), str(m.get("target", "")).lower()):
-                    return (m["language"],)
+                if m.get("kind") == "whisper" and m.get("language"):
+                    for key in (str(m.get("target", "")).lower(), m["id"].lower()):
+                        if key:
+                            out.setdefault(key, m["language"])
     except (OSError, ValueError, KeyError):
-        pass
-    return None
+        return {}
+    _langs_cache = (mtime, out)
+    return out
 
 
 def whisper_models(with_size: bool = False) -> list[dict]:

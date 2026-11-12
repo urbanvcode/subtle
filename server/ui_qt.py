@@ -17,7 +17,7 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import (QEasingCurve, QObject, QPropertyAnimation, QRectF, QSize, Qt, QTimer, QUrl, Signal,
+from PySide6.QtCore import (QEasingCurve, QEvent, QObject, QPropertyAnimation, QRectF, QSize, Qt, QTimer, QUrl, Signal,
                             Property)
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
@@ -362,6 +362,12 @@ class Window(QMainWindow):
             e.ignore()
             self.panel.hide()              # X = back to the tray; Subtle keeps running
 
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        # refreshes pause while minimised: catch up as soon as the window comes back
+        if e.type() == QEvent.WindowStateChange and not self.isMinimized() and self.panel.visible:
+            self.panel.refresh(False)
+
 
 class ControlPanel:
     COLUMN = 940            # page content never runs wider than this (px), even maximised
@@ -412,7 +418,8 @@ class ControlPanel:
 
         self.timer = QTimer()
         self.timer.setInterval(2000)
-        self.timer.timeout.connect(lambda: self.refresh(False))
+        # nothing to draw while minimised: skip the refresh (restoring the window shows fresh numbers 2 s later)
+        self.timer.timeout.connect(lambda: self.win.isMinimized() or self.refresh(False))
 
         start = os.environ.get("SUBTLE_UI_PAGE")
         if start in dict(PAGES):
