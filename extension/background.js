@@ -199,6 +199,11 @@ async function stop(byUser = true) {
     await chrome.action.setBadgeText({ tabId, text: needsClick.has(tabId) ? "▶" : "" }).catch(() => {});
   }
   await setState({ tabId: null, status: "idle", detail: "", source: null });
+  if (reloadPending) {
+    const v = reloadPending;
+    reloadPending = false;
+    await maybeReload(v);
+  }
 }
 
 const ANSWERED = new Set(["start", "stop", "status", "am-i-active"]); // commands that get a response
@@ -254,6 +259,9 @@ function handleMessage(msg, sender, sendResponse) {
         break;
       case "define": // from the offscreen document: the app's answer
         toTab(state.tabId, { type: "define", ...msg.data, word: (msg.data && msg.data.word) || "" }, state.subFrame ?? 0);
+        break;
+      case "app-version": // the Subtle app is newer than this extension: load the new files from disk
+        await maybeReload(msg.version);
         break;
       case "catch-up": // the popup's button
         await catchUp(msg.tabId);
@@ -322,6 +330,27 @@ chrome.runtime.onMessage.addListener(handleMessage);
 globalThis.__subtleBackground = (msg) => {
   handleMessage(msg, {}, () => {});
 };
+
+// The extension is loaded from the Subtle folder, so when the app was updated, the new extension files
+// are already on disk: reload them. Not while subtitles are running (that waits until they stop), and only
+// once per app version (if the files on disk are still older, reloading again would not help).
+let reloadPending = false;
+async function maybeReload(appVersion) {
+  const mine = chrome.runtime.getManifest().version;
+  const num = (v) => String(v || "0").split(".").map((n) => parseInt(n, 10) || 0);
+  const a = num(appVersion), b = num(mine);
+  let newerApp = false;
+  for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) { newerApp = (a[i] || 0) > (b[i] || 0); break; }
+  if (!newerApp) return;
+  const { reloadedFor } = await chrome.storage.local.get("reloadedFor");
+  if (reloadedFor === appVersion) return;
+  if ((await getState()).tabId !== null) {
+    reloadPending = appVersion;
+    return;
+  }
+  await chrome.storage.local.set({ reloadedFor: appVersion });
+  chrome.runtime.reload();
+}
 
 // "Catch me up": the Subtle app summarises the last few minutes; the answer is shown on the video.
 async function catchUp(tabId) {

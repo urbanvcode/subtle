@@ -741,8 +741,10 @@ class ControlPanel:
         self.upd_text = self.label("", "bold", wrap=True)
         ul.addWidget(self.upd_text, 1)
         self.upd_url = ""
-        ul.addWidget(self.button("Download page", lambda: self.upd_url and QDesktopServices.openUrl(QUrl(self.upd_url)), "primary"),
+        ul.addWidget(self.button("Release notes", lambda: self.upd_url and QDesktopServices.openUrl(QUrl(self.upd_url))),
                      0, Qt.AlignVCenter)
+        self.upd_btn = self.button("Update now", lambda: (self.upd_btn.setEnabled(False), self.cmd("update_now")), "primary")
+        ul.addWidget(self.upd_btn, 0, Qt.AlignVCenter)
         self.upd.hide()
         lay.addWidget(self.upd)
 
@@ -1027,10 +1029,23 @@ class ControlPanel:
         self.set_text(self.hero_sub, sub)
 
         up = st.get("update") or {}
+        u = st.get("updater") or {}
         if up.get("version") and up.get("url", "").startswith("https://github.com/"):
             self.upd_url = up["url"]
-            self.set_text(self.upd_text, f"Subtle {up['version']} is available. You have {st.get('version', '')}. "
-                                         "Download it, then run Install Subtle.bat again (your models stay).")
+            state = u.get("state")
+            if state == "downloading":
+                pct = f" {100 * u.get('done', 0) // max(1, u.get('total', 0))}%" if u.get("total") else ""
+                text = f"Downloading Subtle {up['version']}…{pct}"
+            elif state in ("ready", "applying"):
+                text = f"Installing Subtle {up['version']}: Subtle closes and starts again by itself."
+            elif state == "error":
+                text = f"The update didn't work: {u.get('error', '')}"
+            else:
+                text = (f"Subtle {up['version']} is available (you have {st.get('version', '')}). "
+                        "Update now: your models and settings stay, and Subtle restarts by itself.")
+            self.set_text(self.upd_text, text)
+            self.upd_btn.setEnabled(state not in ("downloading", "ready", "applying"))
+            self.set_text(self.upd_btn, "Try again" if state == "error" else "Update now")
             if self.upd.isHidden():
                 self.upd.show()
         elif not self.upd.isHidden():

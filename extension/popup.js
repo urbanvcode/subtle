@@ -294,21 +294,57 @@ function renderSimple() {
   renderLearning();
 }
 
+const vnum = (v) => String(v || "0").split(".").map((n) => parseInt(n, 10) || 0);
+const newer = (a, b) => {
+  const x = vnum(a), y = vnum(b);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+
+function showBanner(kind, title, text, button, onClick) {
+  $("banner").className = "banner" + (kind === "warn" ? " warn" : "");
+  $("bannerTitle").textContent = title;
+  $("bannerText").textContent = text;
+  const b = $("bannerBtn");
+  b.classList.toggle("hidden", !button);
+  b.disabled = false;
+  b.textContent = button || "";
+  b.onclick = onClick || null;
+}
+
 function renderVersion() {
   const v = $("version");
-  if (!info) {
-    v.textContent = `Subtle v${VERSION} · app not running`;
-    v.className = "hint";
-  } else if (info.version !== VERSION) {
-    v.textContent = `Extension v${VERSION} · app v${info.version || "?"} - versions differ: quit and restart Subtle from the tray (and reload the extension if it's older)`;
-    v.className = "hint err";
-  } else if (info.update && info.update.version) {
-    v.textContent = `Subtle v${VERSION} · version ${info.update.version} is available on GitHub (see the Subtle app)`;
-    v.className = "hint";
-  } else {
-    v.textContent = `Subtle v${VERSION}`;
-    v.className = "hint";
+  v.className = "hint";
+  v.textContent = info ? `Subtle v${VERSION}` : `Subtle v${VERSION} · app not running`;
+  if (!info || !info.version) return $("banner").classList.add("hidden");
+  if (newer(VERSION, info.version)) {
+    // the extension was updated but the app still runs the old version
+    return showBanner("warn", "Restart the Subtle app",
+      `The app is still running version ${info.version}. Right-click the Subtle icon next to the clock, choose Quit, then start Subtle again.`);
   }
+  if (newer(info.version, VERSION)) {
+    // the app was updated: this extension reloads itself from the Subtle folder (see background.js)
+    chrome.runtime.sendMessage({ cmd: "app-version", version: info.version }).catch(() => {});
+    return showBanner("info", "Updating the extension…", `To version ${info.version}. This window closes; open it again.`);
+  }
+  const up = info.update;
+  if (up && up.version) {
+    if (info.can_update) {
+      return showBanner("info", `Subtle ${up.version} is available`, "Update with one click. Your models and settings stay; Subtle restarts by itself.",
+        "Update now", () => {
+          $("bannerBtn").disabled = true;
+          $("bannerText").textContent = "Updating… Subtle closes and starts again in a moment.";
+          try {
+            const ws = new WebSocket(s.serverUrl);
+            ws.onopen = () => ws.send(JSON.stringify({ type: "update" }));
+            setTimeout(() => ws.close(), 3000);
+          } catch {}
+        });
+    }
+    return showBanner("info", `Subtle ${up.version} is available`, "Get it from the download page.", "Download",
+      () => chrome.tabs.create({ url: up.url || "https://github.com/ddsaamir/subtle/releases/latest" }));
+  }
+  $("banner").classList.add("hidden");
   if (info && info.transcript_dir) $("transcriptHint").textContent = `Saved as text files in ${info.transcript_dir}. Off: nothing is written to disk.`;
 }
 

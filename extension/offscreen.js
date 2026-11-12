@@ -50,6 +50,8 @@ function connect() {
     }
     if (msg.type === "sub" || msg.type === "clear" || msg.type === "summary" || msg.type === "define") {
       toBackground({ cmd: msg.type, data: msg });
+    } else if (msg.type === "ready" && msg.version) {
+      toBackground({ cmd: "app-version", version: msg.version }); // an updated app: the extension follows
     } else if (msg.type === "status") {
       // Model loading, LLM problems, etc.
       const s = msg.level === "error" ? "error" : msg.level === "busy" ? "connecting" : "live";

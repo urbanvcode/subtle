@@ -45,6 +45,7 @@ import llm_client
 import llm_runner
 import modelstore
 import pcaudio
+import updater as updater_mod
 import settings as settings_mod
 import winutil
 from version import VERSION
@@ -327,6 +328,9 @@ class Tab:
                     self.define_task = asyncio.create_task(self.define(
                         str(msg.get("word") or "")[:60], str(msg.get("context") or "")[:400],
                         str(msg.get("surface") or "")[:60], str(msg.get("reading") or "")[:80]))
+                elif kind == "update":          # the popup's "Update now"
+                    await self.sup.update_now()
+                    await self.send({"type": "update_started"})
                 elif kind == "summary":         # "Catch me up"
                     self.summary_task = asyncio.create_task(self.summarize(float(msg.get("minutes") or 5)))
                 elif kind == "config":
@@ -471,7 +475,9 @@ class Supervisor:
         self.stop_event: asyncio.Event | None = None
         self.downloader = downloads.Downloader(on_change=self._downloads_changed)
         self.update_info: dict | None = None      # {"version", "url"} when GitHub has a newer Subtle
-        self.pc = pcaudio.PcAudio(self, self._pc_message, log, Tab)   # subtitles for the PC's own sound
+        self.pc = pcaudio.PcAudio(self, self._pc_message, log, Tab)
+        self.updater = updater_mod.Updater(log, on_change=self._update_changed)
+        self.update_task: asyncio.Task | None = None   # subtitles for the PC's own sound
         self.pc_status = ""
         self.hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
         self.origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
@@ -536,6 +542,34 @@ class Supervisor:
         return {"language": s.get("pc_language", "ja"), "target": s.get("pc_target", "en"),
                 "mode": s.get("pc_mode", "whisper"), "asr_model": "auto", "llm_model": "",
                 "page_title": "PC sound"}
+
+    # -- one-click update -------------------------------------------------------------------------
+    def _update_changed(self):
+        if self.loop is not None:
+            self.loop.call_soon_threadsafe(lambda: asyncio.ensure_future(self.push_state()))
+
+    async def update_now(self) -> str:
+        """Download, check and apply the newest version; Subtle closes and its updater starts it again."""
+        if self.update_task is not None and not self.update_task.done():
+            return ""
+        self.update_task = asyncio.create_task(self._update_now())
+        return ""
+
+    async def _update_now(self):
+        self.updater.start()
+        while self.updater.state == "downloading":
+            await asyncio.sleep(0.3)
+        if self.updater.state != "ready":
+            await self.push_state()
+            return
+        await self.pc.stop()
+        await self.unload()                         # engine and translator off before files change
+        if self.updater.launch_apply():
+            await self.push_state()
+            return
+        await self.push_state()
+        await asyncio.sleep(0.5)
+        self.stop_event.set()                       # quit; apply_update.py starts the new version
 
     # -- update notice ---------------------------------------------------------------------------
     RELEASES_URL = "https://api.github.com/repos/ddsaamir/subtle/releases/latest"
@@ -636,7 +670,8 @@ class Supervisor:
                 "gpu": gpu.get("name", "CPU"), "backend": s.get("llm_backend"),
                 "panel_url": f"http://127.0.0.1:{self.port}/",
                 "update": self.update_info if s.get("check_updates", True) else None,
-                "simple": self.simple(), "lite": edition.LITE}
+                "simple": self.simple(), "lite": edition.LITE, "can_update": True,
+                "updater": self.updater.snapshot()}
 
     async def gpu_info(self) -> dict:
         if time.monotonic() - self.gpu_at > 4.0:      # nvidia-smi is a process start: not every refresh
@@ -691,6 +726,7 @@ class Supervisor:
               "idle_for": round(time.monotonic() - self.last_audio) if self.last_audio else None,
               "pc": dict(self.pc.snapshot(), status=self.pc_status),
               "simple": self.simple(), "lite": edition.LITE,
+              "updater": self.updater.snapshot(),
               "delay": self.delay_stats(), "update": self.update_info if self.settings.get("check_updates", True) else None}
         if full:
             st["models"] = await asyncio.to_thread(self.models)
@@ -810,6 +846,9 @@ class Supervisor:
         if cmd == "pc_devices":
             return {"devices": await asyncio.to_thread(pcaudio.output_devices),
                     "programs": await asyncio.to_thread(pcaudio.programs)}
+        if cmd == "update_now":
+            await self.update_now()
+            return {"ok": True}
         if cmd == "reset_delay":
             self.delays.clear()
             await self.push_state()
