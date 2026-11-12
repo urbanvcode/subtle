@@ -5,6 +5,14 @@ the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-12
+
+### Fixed
+- Updates back up only the files they replace (an update could copy unrelated folders inside the Subtle
+  folder into its backup). If an update fails, files that only the new version added are removed too.
+- The delay chart uses a square-root scale, so short delays stay visible next to a long one.
+
+
 ## [0.11.0] - 2026-11-12
 
 ### Changed
@@ -135,7 +143,8 @@ First public release.
 - Only one speech model in memory at a time; the translator only runs for the Best engine.
 - Best engine (Whisper turbo + Qwen3 4B) uses about 5.7 GB of video memory; Fast about 4.1 GB.
 
-[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/ddsaamir/subtle/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/ddsaamir/subtle/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ddsaamir/subtle/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ddsaamir/subtle/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ddsaamir/subtle/compare/v0.8.0...v0.9.0

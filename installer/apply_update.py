@@ -139,12 +139,14 @@ def main():
 
     backup = DST / "runtime" / "update" / f"backup-{args.from_version}"
     shutil.rmtree(backup, ignore_errors=True)
-    old_files = program_files(DST)
+    new_files = program_files(SRC)
+    # only what the new version replaces is backed up (other files in the folder are never touched)
+    old_files = [rel for rel in new_files if (DST / rel).is_file()]
+    added = [rel for rel in new_files if not (DST / rel).is_file()]
     copy_tree(old_files, DST, backup)
     say(f"Backed up {len(old_files)} program files.")
 
     try:
-        new_files = program_files(SRC)
         copy_tree(new_files, SRC, DST)
         if sys.platform != "win32":
             for sh in ("install.sh", "subtle.sh"):
@@ -156,6 +158,11 @@ def main():
     except Exception as e:
         say(f"Update failed: {e}. Putting the old version back...")
         copy_tree(old_files, backup, DST)
+        for rel in added:                      # files only the new version has
+            try:
+                (DST / rel).unlink()
+            except OSError:
+                pass
         say("The old version is back.")
         start_subtle()
         if sys.platform == "win32":
